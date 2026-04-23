@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { WorldState } from '../game/useWorld';
 import { ChunkMesh } from './ChunkMesh';
 
@@ -7,12 +6,10 @@ interface WorldProps {
 }
 
 export function World({ world }: WorldProps) {
-  const chunkEntries = useMemo(() => {
-    return Array.from(world.chunks.entries()).map(([key, blocks]) => {
-      const [cx, cz] = key.split(',').map(Number);
-      return { key, cx, cz, blocks };
-    });
-  }, [world.chunks]);
+  const chunkEntries = Array.from(world.chunks.entries()).map(([key, blocks]) => {
+    const [cx, cz] = key.split(',').map(Number);
+    return { key, cx, cz, blocks };
+  });
 
   return (
     <group>

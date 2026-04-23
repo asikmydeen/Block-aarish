@@ -26,8 +26,18 @@ function worldToLocal(wx: number, wy: number, wz: number): [number, number, numb
   return [cx, cz, lx, wy, lz];
 }
 
+function createInitialChunks(): Map<string, Map<string, BlockType>> {
+  const map = new Map<string, Map<string, BlockType>>();
+  for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
+    for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
+      map.set(`${dx},${dz}`, generateChunk(dx, dz, SEED));
+    }
+  }
+  return map;
+}
+
 export function useWorld(): WorldState {
-  const chunksRef = useRef<Map<string, Map<string, BlockType>>>(new Map());
+  const chunksRef = useRef<Map<string, Map<string, BlockType>>>(createInitialChunks());
   const [, forceUpdate] = useState(0);
 
   const ensureChunk = useCallback((cx: number, cz: number) => {
