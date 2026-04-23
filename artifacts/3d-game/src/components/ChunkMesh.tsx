@@ -18,7 +18,7 @@ function getColor(type: BlockType, face: 'top' | 'side' | 'bottom'): THREE.Color
 }
 
 const FACES = [
-  { dir: [0, 1, 0], corners: [[0,1,0],[1,1,0],[1,1,1],[0,1,1]], face: 'top' as const },
+  { dir: [0, 1, 0], corners: [[0,1,0],[0,1,1],[1,1,1],[1,1,0]], face: 'top' as const },
   { dir: [0, -1, 0], corners: [[0,0,1],[1,0,1],[1,0,0],[0,0,0]], face: 'bottom' as const },
   { dir: [1, 0, 0], corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]], face: 'side' as const },
   { dir: [-1, 0, 0], corners: [[0,0,1],[0,1,1],[0,1,0],[0,0,0]], face: 'side' as const },
