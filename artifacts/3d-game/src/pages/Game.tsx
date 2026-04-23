@@ -6,6 +6,7 @@ import { useWorld } from '../game/useWorld';
 import { World } from '../components/World';
 import { Player } from '../components/Player';
 import { GameUI } from '../components/GameUI';
+import { TouchControls, isTouchDevice } from '../components/TouchControls';
 import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS } from '../game/blockColors';
 
@@ -30,11 +31,13 @@ function GameScene({
   selectedBlock,
   onBlockInteract,
   onPositionChange,
+  touchMode,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
   onBlockInteract: (type: 'break' | 'place', wx: number, wy: number, wz: number, blockType?: BlockType) => void;
   onPositionChange: (pos: THREE.Vector3) => void;
+  touchMode: boolean;
 }) {
   return (
     <>
@@ -64,6 +67,7 @@ function GameScene({
         onBlockInteract={onBlockInteract}
         selectedBlock={selectedBlock}
         onPositionChange={onPositionChange}
+        touchMode={touchMode}
       />
     </>
   );
@@ -75,6 +79,8 @@ export default function Game() {
   const [playerPos, setPlayerPos] = useState(() => new THREE.Vector3(8, 25, 8));
   const [isLocked, setIsLocked] = useState(false);
   const [webglError, setWebglError] = useState(false);
+  const [touchMode, setTouchMode] = useState(() => isTouchDevice());
+  const [started, setStarted] = useState(false);
 
   useEffect(() => {
     const handleLockChange = () => {
@@ -162,6 +168,7 @@ export default function Game() {
               selectedBlock={selectedBlock}
               onBlockInteract={handleBlockInteract}
               onPositionChange={handlePositionChange}
+              touchMode={touchMode}
             />
           </Suspense>
         </Canvas>
@@ -171,8 +178,13 @@ export default function Game() {
         selectedBlock={selectedBlock}
         onSelectBlock={setSelectedBlock}
         position={playerPos}
-        isLocked={isLocked}
+        isLocked={touchMode ? started : isLocked}
+        touchMode={touchMode}
+        onToggleTouchMode={() => setTouchMode(t => !t)}
+        onStart={() => setStarted(true)}
       />
+
+      <TouchControls enabled={touchMode && started} />
     </div>
   );
 }

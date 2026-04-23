@@ -8,9 +8,12 @@ interface GameUIProps {
   onSelectBlock: (b: BlockType) => void;
   position: THREE.Vector3;
   isLocked: boolean;
+  touchMode: boolean;
+  onToggleTouchMode: () => void;
+  onStart: () => void;
 }
 
-export function GameUI({ selectedBlock, onSelectBlock, position, isLocked }: GameUIProps) {
+export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart }: GameUIProps) {
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -134,13 +137,30 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked }: Gam
         <div>Z: {position.z.toFixed(1)}</div>
       </div>
 
-      {/* Help button */}
+      {/* Top-right buttons */}
       <div style={{
         position: 'fixed',
         top: 16,
         right: 16,
         zIndex: 100,
+        display: 'flex',
+        gap: 8,
       }}>
+        <button
+          onClick={onToggleTouchMode}
+          style={{
+            background: touchMode ? 'rgba(70,130,180,0.7)' : 'rgba(0,0,0,0.5)',
+            color: 'white',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 6,
+            padding: '4px 12px',
+            cursor: 'pointer',
+            fontFamily: 'monospace',
+            fontSize: 13,
+          }}
+        >
+          {touchMode ? '📱 Touch' : '🖱️ Mouse'}
+        </button>
         <button
           onClick={() => setShowHelp(h => !h)}
           style={{
@@ -176,29 +196,45 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked }: Gam
           minWidth: 200,
         }}>
           <div style={{ fontWeight: 'bold', marginBottom: 4, color: '#aef' }}>Controls</div>
-          <div>WASD — Move</div>
-          <div>Space — Jump</div>
-          <div>Mouse — Look around</div>
-          <div>Left Click — Break block</div>
-          <div>Right Click — Place block</div>
-          <div>1–7 — Select block</div>
-          <div>Click game — Lock mouse</div>
-          <div>Esc — Unlock mouse</div>
+          {touchMode ? (
+            <>
+              <div>Joystick — Move</div>
+              <div>Drag right — Look</div>
+              <div>JUMP button — Jump</div>
+              <div>BREAK — Mine block</div>
+              <div>PLACE — Place block</div>
+              <div>Tap hotbar — Select</div>
+            </>
+          ) : (
+            <>
+              <div>WASD — Move</div>
+              <div>Space — Jump</div>
+              <div>Mouse — Look around</div>
+              <div>Left Click — Break block</div>
+              <div>Right Click — Place block</div>
+              <div>1–7 — Select block</div>
+              <div>Click game — Lock mouse</div>
+              <div>Esc — Unlock mouse</div>
+            </>
+          )}
         </div>
       )}
 
       {/* Click to play overlay */}
       {!isLocked && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(0,0,0,0.4)',
-          zIndex: 200,
-          cursor: 'pointer',
-        }}>
+        <div
+          onClick={touchMode ? onStart : undefined}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.4)',
+            zIndex: 200,
+            cursor: 'pointer',
+          }}
+        >
           <div style={{
             background: 'rgba(0,0,0,0.8)',
             color: 'white',
@@ -215,10 +251,12 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked }: Gam
               A Minecraft-like exploration game
             </div>
             <div style={{ fontSize: 16, color: '#fff' }}>
-              Click to play
+              {touchMode ? 'Tap to play' : 'Click to play'}
             </div>
             <div style={{ fontSize: 12, color: '#888', marginTop: 8 }}>
-              WASD to move • Space to jump • Click to build
+              {touchMode
+                ? 'Joystick to move • Drag to look • Tap buttons to build'
+                : 'WASD to move • Space to jump • Click to build'}
             </div>
           </div>
         </div>

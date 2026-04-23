@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
 import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS } from '../game/blockColors';
+import { touchState, consumeLookDelta, consumeBreak, consumePlace } from './TouchControls';
 
 enum Controls {
   forward = 'forward',
@@ -27,6 +28,7 @@ interface PlayerProps {
   onBlockInteract: (type: 'break' | 'place', wx: number, wy: number, wz: number, blockType?: BlockType) => void;
   selectedBlock: BlockType;
   onPositionChange: (pos: THREE.Vector3) => void;
+  touchMode: boolean;
 }
 
 function raycastBlocks(
@@ -89,7 +91,7 @@ function raycastBlocks(
   return { hit: false };
 }
 
-export function Player({ world, onBlockInteract, selectedBlock, onPositionChange }: PlayerProps) {
+export function Player({ world, onBlockInteract, selectedBlock, onPositionChange, touchMode }: PlayerProps) {
   const { camera, gl } = useThree();
   const velocityRef = useRef(new THREE.Vector3());
   const positionRef = useRef(new THREE.Vector3(8, 25, 8));
@@ -99,12 +101,12 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
   const pitchRef = useRef(0);
   const isLockedRef = useRef(false);
   const highlightRef = useRef<THREE.Mesh>(null);
-  const prevMouseDown = useRef(false);
-  const rightPrevMouseDown = useRef(false);
-  const breakCooldown = useRef(0);
-  const placeCooldown = useRef(0);
 
   useEffect(() => {
+    if (touchMode) {
+      isLockedRef.current = true;
+      return;
+    }
     const handleClick = () => {
       gl.domElement.requestPointerLock();
     };
@@ -128,9 +130,10 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
       document.removeEventListener('pointerlockchange', handleLockChange);
       document.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [gl]);
+  }, [gl, touchMode]);
 
   useEffect(() => {
+    if (touchMode) return;
     const handleMouseDown = (e: MouseEvent) => {
       if (!isLockedRef.current) return;
       if (e.button === 0) {
@@ -171,11 +174,19 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
       gl.domElement.removeEventListener('mousedown', handleMouseDown);
       gl.domElement.removeEventListener('contextmenu', handleContextMenu);
     };
-  }, [camera, world.getBlock, onBlockInteract, selectedBlock]);
+  }, [camera, world.getBlock, onBlockInteract, selectedBlock, touchMode]);
 
   useFrame((_, delta) => {
     const controls = getControls();
     const dt = Math.min(delta, 0.05);
+
+    if (touchMode) {
+      const { dx, dy } = consumeLookDelta();
+      const sensitivity = 0.005;
+      yawRef.current -= dx * sensitivity;
+      pitchRef.current -= dy * sensitivity;
+      pitchRef.current = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitchRef.current));
+    }
 
     const yaw = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yawRef.current, 0));
     const pitch = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitchRef.current, 0, 0));
@@ -186,14 +197,22 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
     forward.y = 0;
     forward.normalize();
 
-    const sprint = controls.forward && !controls.back;
-    const speed = sprint ? SPRINT_SPEED : MOVE_SPEED;
     const moveDir = new THREE.Vector3();
 
-    if (controls.forward) moveDir.add(forward);
-    if (controls.back) moveDir.sub(forward);
-    if (controls.right) moveDir.add(right);
-    if (controls.left) moveDir.sub(right);
+    if (touchMode) {
+      if (Math.abs(touchState.moveX) > 0.05 || Math.abs(touchState.moveY) > 0.05) {
+        moveDir.add(forward.clone().multiplyScalar(touchState.moveY));
+        moveDir.add(right.clone().multiplyScalar(touchState.moveX));
+      }
+    } else {
+      if (controls.forward) moveDir.add(forward);
+      if (controls.back) moveDir.sub(forward);
+      if (controls.right) moveDir.add(right);
+      if (controls.left) moveDir.sub(right);
+    }
+
+    const sprint = !touchMode && controls.forward && !controls.back;
+    const speed = sprint ? SPRINT_SPEED : MOVE_SPEED;
 
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize().multiplyScalar(speed);
@@ -202,9 +221,39 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
     velocityRef.current.x = moveDir.x;
     velocityRef.current.z = moveDir.z;
 
-    if (controls.jump && isGroundedRef.current) {
+    const wantJump = touchMode ? touchState.jump : controls.jump;
+    if (wantJump && isGroundedRef.current) {
       velocityRef.current.y = JUMP_VELOCITY;
       isGroundedRef.current = false;
+    }
+
+    if (touchMode) {
+      if (consumeBreak()) {
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+        if (result.hit && result.blockPos) {
+          onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
+        }
+      }
+      if (consumePlace()) {
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir);
+        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+        if (result.hit && result.blockPos && result.normal) {
+          const px = result.blockPos.x + result.normal.x;
+          const py = result.blockPos.y + result.normal.y;
+          const pz = result.blockPos.z + result.normal.z;
+          const playerBlockX = Math.floor(positionRef.current.x);
+          const playerBlockY = Math.floor(positionRef.current.y);
+          const playerBlockZ = Math.floor(positionRef.current.z);
+          if (
+            !(px === playerBlockX && pz === playerBlockZ && (py === playerBlockY || py === playerBlockY + 1))
+          ) {
+            onBlockInteract('place', px, py, pz, selectedBlock);
+          }
+        }
+      }
     }
 
     velocityRef.current.y += GRAVITY * dt;
