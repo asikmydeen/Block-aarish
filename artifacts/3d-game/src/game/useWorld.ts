@@ -59,12 +59,10 @@ export function useWorld(): WorldState {
   const setBlock = useCallback((wx: number, wy: number, wz: number, type: BlockType) => {
     const [cx, cz, lx, ly, lz] = worldToLocal(wx, wy, wz);
     const chunkKey = `${cx},${cz}`;
-    let chunk = chunksRef.current.get(chunkKey);
-    if (!chunk) {
-      chunk = generateChunk(cx, cz, SEED);
-      chunksRef.current.set(chunkKey, chunk);
-    }
-    chunk.set(`${lx},${ly},${lz}`, type);
+    const existing = chunksRef.current.get(chunkKey) ?? generateChunk(cx, cz, SEED);
+    const nextChunk = new Map(existing);
+    nextChunk.set(`${lx},${ly},${lz}`, type);
+    chunksRef.current.set(chunkKey, nextChunk);
     forceUpdate(n => n + 1);
   }, []);
 
