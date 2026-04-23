@@ -76,7 +76,7 @@ function GameScene({
 export default function Game() {
   const world = useWorld();
   const [selectedBlock, setSelectedBlock] = useState<BlockType>('dirt');
-  const [playerPos, setPlayerPos] = useState(() => new THREE.Vector3(8, 25, 8));
+  const [playerPos, setPlayerPos] = useState(() => new THREE.Vector3(8, 18, 8));
   const [isLocked, setIsLocked] = useState(false);
   const [webglError, setWebglError] = useState(false);
   const [touchMode, setTouchMode] = useState(() => isTouchDevice());
@@ -158,7 +158,7 @@ export default function Game() {
             failIfMajorPerformanceCaveat: false,
           }}
           onCreated={handleCreated}
-          camera={{ fov: 75, near: 0.05, far: 500, position: [8, 25, 8] }}
+          camera={{ fov: 75, near: 0.05, far: 500, position: [8, 18, 8] }}
           shadows
           style={{ position: 'absolute', inset: 0 }}
         >

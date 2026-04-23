@@ -94,7 +94,7 @@ function raycastBlocks(
 export function Player({ world, onBlockInteract, selectedBlock, onPositionChange, touchMode }: PlayerProps) {
   const { camera, gl } = useThree();
   const velocityRef = useRef(new THREE.Vector3());
-  const positionRef = useRef(new THREE.Vector3(8, 25, 8));
+  const positionRef = useRef(new THREE.Vector3(8, 18, 8));
   const isGroundedRef = useRef(false);
   const [, getControls] = useKeyboardControls<Controls>();
   const yawRef = useRef(0);
@@ -298,7 +298,7 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
     }
 
     if (pos.y < -10) {
-      pos.set(8, 25, 8);
+      pos.set(8, 18, 8);
       velocityRef.current.set(0, 0, 0);
     }
 

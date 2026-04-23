@@ -45,89 +45,37 @@ function fbm(x: number, z: number, seed: number, octaves: number = 4): number {
   return value / max;
 }
 
-export function getTerrainHeight(worldX: number, worldZ: number, seed: number = 42): number {
-  const scale = 0.05;
-  const height = fbm(worldX * scale, worldZ * scale, seed);
-  return Math.floor(height * 20) + 5;
-}
+const FLOOR_SURFACE_Y = 12;
 
-function shouldPlaceTree(worldX: number, worldZ: number, seed: number): boolean {
-  const v = noise(worldX * 3.7 + 11.3, worldZ * 3.7 + 23.7, seed + 500);
-  return v > 0.93;
+export function getTerrainHeight(_worldX: number, _worldZ: number, _seed: number = 42): number {
+  return FLOOR_SURFACE_Y;
 }
 
 export function generateChunk(chunkX: number, chunkZ: number, seed: number = 42): Map<string, BlockType> {
   const blocks = new Map<string, BlockType>();
 
-  const treePositions: Set<string> = new Set();
-
   for (let lx = 0; lx < CHUNK_SIZE; lx++) {
     for (let lz = 0; lz < CHUNK_SIZE; lz++) {
       const worldX = chunkX * CHUNK_SIZE + lx;
       const worldZ = chunkZ * CHUNK_SIZE + lz;
-      const surfaceY = getTerrainHeight(worldX, worldZ, seed);
+      const surfaceY = FLOOR_SURFACE_Y;
 
-      if (shouldPlaceTree(worldX, worldZ, seed) && surfaceY > 7 && surfaceY < 20) {
-        treePositions.add(`${lx},${lz}`);
-      }
-
-      for (let y = 0; y <= WORLD_HEIGHT; y++) {
+      for (let y = 0; y <= surfaceY; y++) {
         const key = `${lx},${y},${lz}`;
         if (y === 0) {
           blocks.set(key, 'bedrock');
-        } else if (y < surfaceY - 4) {
-          const stoneNoise = noise(worldX * 0.5, y * 0.5, seed + worldZ * 0.5 + 999);
-          if (stoneNoise > 0.9) {
+        } else if (y === surfaceY) {
+          blocks.set(key, 'grass');
+        } else if (y >= surfaceY - 3) {
+          blocks.set(key, 'dirt');
+        } else {
+          const oreNoise = noise(worldX * 0.7 + 17.1, y * 0.9, seed + worldZ * 0.7 + 999);
+          if (oreNoise > 0.93) {
             blocks.set(key, 'iron');
-          } else if (stoneNoise > 0.82) {
+          } else if (oreNoise > 0.85) {
             blocks.set(key, 'coal');
           } else {
             blocks.set(key, 'stone');
-          }
-        } else if (y < surfaceY) {
-          blocks.set(key, 'dirt');
-        } else if (y === surfaceY) {
-          if (surfaceY <= 6) {
-            blocks.set(key, 'sand');
-          } else if (surfaceY >= 22) {
-            blocks.set(key, 'snow');
-          } else {
-            blocks.set(key, 'grass');
-          }
-        } else if (y <= 5 && y > surfaceY) {
-          blocks.set(key, 'water');
-        }
-      }
-    }
-  }
-
-  for (const pos of treePositions) {
-    const [lxStr, lzStr] = pos.split(',');
-    const lx = parseInt(lxStr);
-    const lz = parseInt(lzStr);
-    const worldX = chunkX * CHUNK_SIZE + lx;
-    const worldZ = chunkZ * CHUNK_SIZE + lz;
-    const surfaceY = getTerrainHeight(worldX, worldZ, seed);
-
-    const trunkHeight = 4 + Math.floor(noise(worldX * 7.1, worldZ * 7.1, seed + 300) * 3);
-
-    for (let ty = 1; ty <= trunkHeight; ty++) {
-      const key = `${lx},${surfaceY + ty},${lz}`;
-      blocks.set(key, 'wood');
-    }
-
-    const leafTop = surfaceY + trunkHeight;
-    for (let ly = leafTop - 2; ly <= leafTop + 1; ly++) {
-      const radius = ly >= leafTop ? 1 : 2;
-      for (let dx = -radius; dx <= radius; dx++) {
-        for (let dz = -radius; dz <= radius; dz++) {
-          if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
-          const llx = lx + dx;
-          const llz = lz + dz;
-          if (llx < 0 || llx >= CHUNK_SIZE || llz < 0 || llz >= CHUNK_SIZE) continue;
-          const lkey = `${llx},${ly},${llz}`;
-          if (!blocks.get(lkey) || blocks.get(lkey) === 'air') {
-            blocks.set(lkey, 'leaves');
           }
         }
       }
