@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, Suspense } from 'react';
+import { useState, useCallback, useEffect, useRef, Suspense, type MutableRefObject } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls, Sky, Stars } from '@react-three/drei';
 import * as THREE from 'three';
@@ -45,7 +45,7 @@ function GameScene({
   onBlockInteract: (type: 'break' | 'place', wx: number, wy: number, wz: number, blockType?: BlockType) => void;
   onPositionChange: (pos: THREE.Vector3) => void;
   touchMode: boolean;
-  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  playerPosRef: MutableRefObject<THREE.Vector3>;
   respawnSignal: number;
   onDamagePlayer: (amount: number) => void;
   alive: boolean;

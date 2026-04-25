@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, type MutableRefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useKeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -29,7 +29,7 @@ interface PlayerProps {
   selectedBlock: BlockType;
   onPositionChange: (pos: THREE.Vector3) => void;
   touchMode: boolean;
-  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  playerPosRef: MutableRefObject<THREE.Vector3>;
   respawnSignal: number;
 }
 
@@ -108,7 +108,7 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
     if (respawnSignal === 0) return;
     positionRef.current.set(8, 18, 8);
     velocityRef.current.set(0, 0, 0);
-    playerPosRef.current.set(8, 18, 8);
+    if (playerPosRef?.current) playerPosRef.current.set(8, 18, 8);
   }, [respawnSignal, playerPosRef]);
 
   useEffect(() => {
@@ -312,7 +312,7 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
     }
 
     positionRef.current.copy(pos);
-    playerPosRef.current.copy(pos);
+    if (playerPosRef?.current) playerPosRef.current.copy(pos);
     camera.position.set(pos.x, pos.y + PLAYER_HEIGHT - 0.1, pos.z);
 
     onPositionChange(positionRef.current);

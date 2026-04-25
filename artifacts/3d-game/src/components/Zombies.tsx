@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type MutableRefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
@@ -61,7 +61,7 @@ function createZombies(): ZombieData[] {
 
 interface ZombiesProps {
   world: WorldState;
-  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  playerPosRef: MutableRefObject<THREE.Vector3>;
   onDamagePlayer: (amount: number) => void;
   alive: boolean;
 }
@@ -79,6 +79,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
   );
 
   useFrame((_, delta) => {
+    if (!playerPosRef?.current) return;
     const dt = Math.min(delta, 0.1);
     const t = performance.now() * 0.005;
     const player = playerPosRef.current;
