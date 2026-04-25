@@ -139,6 +139,11 @@ function buildCottage(updates: BlockUpdate[], cx: number, cz: number) {
   // Interior: kitchen at back-left, bathroom at back-right
   addKitchen(updates, cx - 2, cz + 2, baseY);
   addBathroom(updates, cx + 2, cz + 2, baseY);
+  // Interactive: door in doorway, chest near left wall, bed in front-right area
+  set(updates, cx, baseY, cz - d, 'door');
+  set(updates, cx, baseY + 1, cz - d, 'door');
+  set(updates, cx - 3, baseY, cz - 2, 'chest');
+  set(updates, cx + 2, baseY, cz - 2, 'bed');
 }
 
 // ── Cabin ──────────────────────────────────────────────────────────────────
@@ -226,6 +231,13 @@ function buildCabin(updates: BlockUpdate[], cx: number, cz: number) {
 
   // ── Second floor interior: bathroom ──
   addBathroom(updates, cx + 3, cz + 4, f2Base + 1);
+
+  // Interactive: front door, chest on ground floor, bed on second floor
+  set(updates, cx, baseY, cz - d, 'door');
+  set(updates, cx, baseY + 1, cz - d, 'door');
+  set(updates, cx - 4, baseY, cz - 4, 'chest');
+  set(updates, cx - 4, f2Base + 1, cz - 4, 'bed');
+  set(updates, cx - 3, f2Base + 1, cz - 4, 'bed');
 }
 
 // ── Modern ─────────────────────────────────────────────────────────────────
@@ -308,6 +320,15 @@ function buildModern(updates: BlockUpdate[], cx: number, cz: number) {
   addKitchen(updates, cx + 3, cz + 2, baseY);
   addBathroom(updates, cx + 3, cz - 2, baseY);
   addBathroom(updates, cx + 3, cz + 2, f2Base + 1);
+
+  // Interactive: double front door, chest ground floor, bed second floor
+  set(updates, cx, baseY, cz - d, 'door');
+  set(updates, cx + 1, baseY, cz - d, 'door');
+  set(updates, cx, baseY + 1, cz - d, 'door');
+  set(updates, cx + 1, baseY + 1, cz - d, 'door');
+  set(updates, cx - 4, baseY, cz + 2, 'chest');
+  set(updates, cx - 4, f2Base + 1, cz + 2, 'bed');
+  set(updates, cx - 3, f2Base + 1, cz + 2, 'bed');
 }
 
 // ── Futuristic ─────────────────────────────────────────────────────────────
@@ -360,6 +381,12 @@ function buildFuturistic(updates: BlockUpdate[], cx: number, cz: number) {
 
   // Interior bathroom pod
   addBathroom(updates, cx + 2, cz + 2, baseY + 1);
+
+  // Interactive: front door, chest inside
+  set(updates, cx, baseY, cz - d, 'door');
+  set(updates, cx, baseY + 1, cz - d, 'door');
+  set(updates, cx - 2, baseY + 1, cz - 2, 'chest');
+  set(updates, cx - 2, baseY + 1, cz + 0, 'bed');
 }
 
 // ── Tower ──────────────────────────────────────────────────────────────────
@@ -412,6 +439,13 @@ function buildTower(updates: BlockUpdate[], cx: number, cz: number) {
   addStairs(updates, cx + w - 1, baseY + 3, cz + d - 1, 0, -1, 3);
   addStairs(updates, cx + w - 1, baseY + 6, cz + d - 1, 0, -1, 3);
   addBathroom(updates, cx - 1, cz + 1, baseY + 1);
+
+  // Interactive: door, chest on floor 1, chest on floor 3, bed on floor 2
+  set(updates, cx, baseY, cz - d, 'door');
+  set(updates, cx, baseY + 1, cz - d, 'door');
+  set(updates, cx - 2, baseY + 1, cz + 1, 'chest');
+  set(updates, cx - 2, baseY + 4, cz + 1, 'bed');
+  set(updates, cx - 2, baseY + 7, cz + 1, 'chest');
 }
 
 // ── Skyscraper ─────────────────────────────────────────────────────────────
@@ -507,6 +541,16 @@ function buildSkyscraper(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx, roofY + 4, cz, 'neon');
   set(updates, cx, roofY + 5, cz, 'neon');
   set(updates, cx, roofY + 6, cz, 'metal');
+
+  // Interactive: lobby double door, chests on several floors
+  set(updates, cx, baseY, cz - d, 'door');
+  set(updates, cx + 1, baseY, cz - d, 'door');
+  set(updates, cx, baseY + 1, cz - d, 'door');
+  set(updates, cx + 1, baseY + 1, cz - d, 'door');
+  set(updates, cx - 2, baseY + 1, cz - 2, 'chest');
+  set(updates, cx - 2, baseY + 5, cz - 2, 'chest');
+  set(updates, cx - 2, baseY + 9, cz - 2, 'chest');
+  set(updates, cx - 2, baseY + 13, cz - 2, 'chest');
 }
 
 // ── Apartment ──────────────────────────────────────────────────────────────
@@ -619,4 +663,22 @@ function buildApartment(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx + w - 2, roofY + 3, cz + d - 2, 'water');
   set(updates, cx + w - 3, roofY + 2, cz + d - 2, 'metal');
   set(updates, cx + w - 1, roofY + 2, cz + d - 2, 'metal');
+
+  // Interactive: three unit doors across front, chests + beds per unit
+  for (const udx of [-4, 0, 4]) {
+    set(updates, cx + udx, baseY, cz - d, 'door');
+    set(updates, cx + udx, baseY + 1, cz - d, 'door');
+  }
+  // Ground floor: chests in each unit lobby
+  set(updates, cx - 5, baseY + 1, cz - 3, 'chest');
+  set(updates, cx + 1, baseY + 1, cz - 3, 'chest');
+  set(updates, cx + 5, baseY + 1, cz - 3, 'chest');
+  // Second floor: beds in each unit
+  set(updates, cx - 5, baseY + floorHeight + 1, cz - 3, 'bed');
+  set(updates, cx - 4, baseY + floorHeight + 1, cz - 3, 'bed');
+  set(updates, cx + 2, baseY + floorHeight + 1, cz - 3, 'bed');
+  set(updates, cx + 3, baseY + floorHeight + 1, cz - 3, 'bed');
+  // Third floor: chests with extra loot
+  set(updates, cx - 5, baseY + floorHeight * 2 + 1, cz - 3, 'chest');
+  set(updates, cx + 4, baseY + floorHeight * 2 + 1, cz - 3, 'chest');
 }

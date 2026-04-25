@@ -17,6 +17,9 @@ export const BLOCK_COLORS: Record<BlockType, string> = {
   metal: '#B0B8C0',
   concrete: '#D8D5CE',
   neon: '#39FFCB',
+  chest: '#8B6914',
+  door: '#5C3317',
+  bed: '#C84040',
 };
 
 export const BLOCK_TOP_COLORS: Record<BlockType, string> = {
@@ -36,6 +39,9 @@ export const BLOCK_TOP_COLORS: Record<BlockType, string> = {
   metal: '#C8D0D8',
   concrete: '#E5E2DC',
   neon: '#5BFFE0',
+  chest: '#D4AF37',
+  door: '#7A4520',
+  bed: '#F5F0E8',
 };
 
 export const BLOCK_EMISSIVE: Partial<Record<BlockType, string>> = {
@@ -66,10 +72,15 @@ export const BLOCK_NAMES: Record<BlockType, string> = {
   metal: 'Metal',
   concrete: 'Concrete',
   neon: 'Neon',
+  chest: 'Chest',
+  door: 'Door',
+  bed: 'Bed',
 };
 
 export const TRANSPARENT_BLOCKS: Set<BlockType> = new Set(['water', 'glass']);
 
 export const PLACEABLE_BLOCKS: BlockType[] = [
-  'dirt', 'stone', 'wood', 'glass', 'concrete', 'metal', 'neon', 'leaves',
+  'dirt', 'stone', 'wood', 'glass', 'concrete', 'metal', 'neon', 'leaves', 'door',
 ];
+
+export const INTERACTIVE_BLOCKS: Set<BlockType> = new Set<BlockType>(['chest', 'door', 'bed']);

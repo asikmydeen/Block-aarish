@@ -4,7 +4,7 @@ import { useKeyboardControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
 import { BlockType } from '../game/terrain';
-import { PLACEABLE_BLOCKS } from '../game/blockColors';
+import { PLACEABLE_BLOCKS, INTERACTIVE_BLOCKS } from '../game/blockColors';
 import { touchState, consumeLookDelta, consumeBreak, consumePlace } from './TouchControls';
 
 enum Controls {
@@ -26,6 +26,7 @@ const REACH = 5;
 interface PlayerProps {
   world: WorldState;
   onBlockInteract: (type: 'break' | 'place', wx: number, wy: number, wz: number, blockType?: BlockType) => void;
+  onInteract?: (wx: number, wy: number, wz: number) => void;
   selectedBlock: BlockType;
   onPositionChange: (pos: THREE.Vector3) => void;
   touchMode: boolean;
@@ -93,7 +94,7 @@ function raycastBlocks(
   return { hit: false };
 }
 
-export function Player({ world, onBlockInteract, selectedBlock, onPositionChange, touchMode, playerPosRef, respawnSignal }: PlayerProps) {
+export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPositionChange, touchMode, playerPosRef, respawnSignal }: PlayerProps) {
   const { camera, gl } = useThree();
   const velocityRef = useRef(new THREE.Vector3());
   const positionRef = useRef(new THREE.Vector3(8, 18, 8));
@@ -159,16 +160,22 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
         camera.getWorldDirection(dir);
         const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
         if (result.hit && result.blockPos && result.normal) {
-          const px = result.blockPos.x + result.normal.x;
-          const py = result.blockPos.y + result.normal.y;
-          const pz = result.blockPos.z + result.normal.z;
-          const playerBlockX = Math.floor(positionRef.current.x);
-          const playerBlockY = Math.floor(positionRef.current.y);
-          const playerBlockZ = Math.floor(positionRef.current.z);
-          if (
-            !(px === playerBlockX && pz === playerBlockZ && (py === playerBlockY || py === playerBlockY + 1))
-          ) {
-            onBlockInteract('place', px, py, pz, selectedBlock);
+          const { x: bx, y: by, z: bz } = result.blockPos;
+          const bt = world.getBlock(bx, by, bz);
+          if (bt && INTERACTIVE_BLOCKS.has(bt) && onInteract) {
+            onInteract(bx, by, bz);
+          } else {
+            const px = bx + result.normal.x;
+            const py = by + result.normal.y;
+            const pz = bz + result.normal.z;
+            const playerBlockX = Math.floor(positionRef.current.x);
+            const playerBlockY = Math.floor(positionRef.current.y);
+            const playerBlockZ = Math.floor(positionRef.current.z);
+            if (
+              !(px === playerBlockX && pz === playerBlockZ && (py === playerBlockY || py === playerBlockY + 1))
+            ) {
+              onBlockInteract('place', px, py, pz, selectedBlock);
+            }
           }
         }
       }
@@ -250,16 +257,22 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
         camera.getWorldDirection(dir);
         const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
         if (result.hit && result.blockPos && result.normal) {
-          const px = result.blockPos.x + result.normal.x;
-          const py = result.blockPos.y + result.normal.y;
-          const pz = result.blockPos.z + result.normal.z;
-          const playerBlockX = Math.floor(positionRef.current.x);
-          const playerBlockY = Math.floor(positionRef.current.y);
-          const playerBlockZ = Math.floor(positionRef.current.z);
-          if (
-            !(px === playerBlockX && pz === playerBlockZ && (py === playerBlockY || py === playerBlockY + 1))
-          ) {
-            onBlockInteract('place', px, py, pz, selectedBlock);
+          const { x: bx, y: by, z: bz } = result.blockPos;
+          const bt = world.getBlock(bx, by, bz);
+          if (bt && INTERACTIVE_BLOCKS.has(bt) && onInteract) {
+            onInteract(bx, by, bz);
+          } else {
+            const px = bx + result.normal.x;
+            const py = by + result.normal.y;
+            const pz = bz + result.normal.z;
+            const playerBlockX = Math.floor(positionRef.current.x);
+            const playerBlockY = Math.floor(positionRef.current.y);
+            const playerBlockZ = Math.floor(positionRef.current.z);
+            if (
+              !(px === playerBlockX && pz === playerBlockZ && (py === playerBlockY || py === playerBlockY + 1))
+            ) {
+              onBlockInteract('place', px, py, pz, selectedBlock);
+            }
           }
         }
       }

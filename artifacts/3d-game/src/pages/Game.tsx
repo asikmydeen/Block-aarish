@@ -12,6 +12,7 @@ import { Zombies } from '../components/Zombies';
 import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS } from '../game/blockColors';
 import { generateHouseUpdates } from '../game/houses';
+import { ChestUI, Toast, LootItem, generateLoot } from '../components/InteractionUI';
 
 enum Controls {
   forward = 'forward',
@@ -33,6 +34,7 @@ function GameScene({
   world,
   selectedBlock,
   onBlockInteract,
+  onInteract,
   onPositionChange,
   touchMode,
   playerPosRef,
@@ -43,6 +45,7 @@ function GameScene({
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
   onBlockInteract: (type: 'break' | 'place', wx: number, wy: number, wz: number, blockType?: BlockType) => void;
+  onInteract: (wx: number, wy: number, wz: number) => void;
   onPositionChange: (pos: THREE.Vector3) => void;
   touchMode: boolean;
   playerPosRef: MutableRefObject<THREE.Vector3>;
@@ -83,6 +86,7 @@ function GameScene({
       <Player
         world={world}
         onBlockInteract={onBlockInteract}
+        onInteract={onInteract}
         selectedBlock={selectedBlock}
         onPositionChange={onPositionChange}
         touchMode={touchMode}
@@ -105,8 +109,12 @@ export default function Game() {
   const [respawnSignal, setRespawnSignal] = useState(0);
   const [showDeath, setShowDeath] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
+  const [chestOpen, setChestOpen] = useState(false);
+  const [chestLoot, setChestLoot] = useState<LootItem[]>([]);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
   const playerPosRef = useRef(new THREE.Vector3(8, 18, 8));
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const healthRef = useRef(10);
   const aliveRef = useRef(true);
 
@@ -147,9 +155,35 @@ export default function Game() {
     setRespawnSignal(s => s + 1);
   }, []);
 
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
+  }, []);
+
+  const handleInteract = useCallback((wx: number, wy: number, wz: number) => {
+    const bt = world.getBlock(wx, wy, wz);
+    if (bt === 'door') {
+      world.setBlock(wx, wy, wz, 'air');
+      const above = world.getBlock(wx, wy + 1, wz);
+      const below = world.getBlock(wx, wy - 1, wz);
+      if (above === 'door') world.setBlock(wx, wy + 1, wz, 'air');
+      if (below === 'door') world.setBlock(wx, wy - 1, wz, 'air');
+    } else if (bt === 'chest') {
+      setChestLoot(generateLoot());
+      setChestOpen(true);
+      if (document.pointerLockElement) document.exitPointerLock();
+    } else if (bt === 'bed') {
+      healthRef.current = 10;
+      setHealth(10);
+      showToast('You slept soundly. Full health restored.');
+    }
+  }, [world, showToast]);
+
   useEffect(() => {
     return () => {
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, []);
 
@@ -246,6 +280,7 @@ export default function Game() {
               world={world}
               selectedBlock={selectedBlock}
               onBlockInteract={handleBlockInteract}
+              onInteract={handleInteract}
               onPositionChange={handlePositionChange}
               touchMode={touchMode}
               playerPosRef={playerPosRef}
@@ -320,6 +355,15 @@ export default function Game() {
       )}
 
       <TouchControls enabled={touchMode && started && !showDeath} />
+
+      {chestOpen && (
+        <ChestUI
+          loot={chestLoot}
+          onClose={() => setChestOpen(false)}
+        />
+      )}
+
+      {toastMsg && <Toast message={toastMsg} />}
     </div>
   );
 }

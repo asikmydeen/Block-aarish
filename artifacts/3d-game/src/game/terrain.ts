@@ -1,4 +1,4 @@
-export type BlockType = 'air' | 'grass' | 'dirt' | 'stone' | 'sand' | 'wood' | 'leaves' | 'water' | 'snow' | 'coal' | 'iron' | 'bedrock' | 'glass' | 'metal' | 'concrete' | 'neon';
+export type BlockType = 'air' | 'grass' | 'dirt' | 'stone' | 'sand' | 'wood' | 'leaves' | 'water' | 'snow' | 'coal' | 'iron' | 'bedrock' | 'glass' | 'metal' | 'concrete' | 'neon' | 'chest' | 'door' | 'bed';
 
 export interface Block {
   type: BlockType;
