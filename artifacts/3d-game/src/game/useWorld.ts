@@ -5,10 +5,18 @@ const CHUNK_SIZE = 16;
 const RENDER_DISTANCE = 3;
 const SEED = Math.floor(Math.random() * 10000);
 
+export interface BlockUpdate {
+  wx: number;
+  wy: number;
+  wz: number;
+  type: BlockType;
+}
+
 export interface WorldState {
   chunks: Map<string, Map<string, BlockType>>;
   getBlock: (wx: number, wy: number, wz: number) => BlockType | undefined;
   setBlock: (wx: number, wy: number, wz: number, type: BlockType) => void;
+  setBlocks: (updates: BlockUpdate[]) => void;
   loadChunksAround: (wx: number, wz: number) => void;
 }
 
@@ -66,6 +74,26 @@ export function useWorld(): WorldState {
     forceUpdate(n => n + 1);
   }, []);
 
+  const setBlocks = useCallback((updates: BlockUpdate[]) => {
+    if (updates.length === 0) return;
+    const cloned = new Map<string, Map<string, BlockType>>();
+    for (const u of updates) {
+      const [cx, cz, lx, ly, lz] = worldToLocal(u.wx, u.wy, u.wz);
+      const chunkKey = `${cx},${cz}`;
+      let nc = cloned.get(chunkKey);
+      if (!nc) {
+        const existing = chunksRef.current.get(chunkKey) ?? generateChunk(cx, cz, SEED);
+        nc = new Map(existing);
+        cloned.set(chunkKey, nc);
+      }
+      nc.set(`${lx},${ly},${lz}`, u.type);
+    }
+    for (const [ck, nc] of cloned) {
+      chunksRef.current.set(ck, nc);
+    }
+    forceUpdate(n => n + 1);
+  }, []);
+
   const loadChunksAround = useCallback((wx: number, wz: number) => {
     const [pcx, pcz] = worldToChunk(Math.floor(wx), Math.floor(wz));
     let loaded = false;
@@ -89,6 +117,7 @@ export function useWorld(): WorldState {
     chunks: chunksRef.current,
     getBlock,
     setBlock,
+    setBlocks,
     loadChunksAround,
   };
 }

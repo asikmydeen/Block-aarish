@@ -7,8 +7,10 @@ import { World } from '../components/World';
 import { Player } from '../components/Player';
 import { GameUI } from '../components/GameUI';
 import { TouchControls, isTouchDevice } from '../components/TouchControls';
+import { Villagers } from '../components/Villagers';
 import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS } from '../game/blockColors';
+import { generateHouseUpdates } from '../game/houses';
 
 enum Controls {
   forward = 'forward',
@@ -62,6 +64,7 @@ function GameScene({
       <Stars radius={300} depth={50} count={3000} factor={4} />
 
       <World world={world} />
+      <Villagers world={world} />
       <Player
         world={world}
         onBlockInteract={onBlockInteract}
@@ -81,6 +84,11 @@ export default function Game() {
   const [webglError, setWebglError] = useState(false);
   const [touchMode, setTouchMode] = useState(() => isTouchDevice());
   const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    world.setBlocks(generateHouseUpdates());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const handleLockChange = () => {
