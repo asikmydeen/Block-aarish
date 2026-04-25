@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls, Sky, Stars } from '@react-three/drei';
 import * as THREE from 'three';
@@ -8,6 +8,7 @@ import { Player } from '../components/Player';
 import { GameUI } from '../components/GameUI';
 import { TouchControls, isTouchDevice } from '../components/TouchControls';
 import { Villagers } from '../components/Villagers';
+import { Zombies } from '../components/Zombies';
 import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS } from '../game/blockColors';
 import { generateHouseUpdates } from '../game/houses';
@@ -34,12 +35,20 @@ function GameScene({
   onBlockInteract,
   onPositionChange,
   touchMode,
+  playerPosRef,
+  respawnSignal,
+  onDamagePlayer,
+  alive,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
   onBlockInteract: (type: 'break' | 'place', wx: number, wy: number, wz: number, blockType?: BlockType) => void;
   onPositionChange: (pos: THREE.Vector3) => void;
   touchMode: boolean;
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  respawnSignal: number;
+  onDamagePlayer: (amount: number) => void;
+  alive: boolean;
 }) {
   return (
     <>
@@ -65,12 +74,20 @@ function GameScene({
 
       <World world={world} />
       <Villagers world={world} />
+      <Zombies
+        world={world}
+        playerPosRef={playerPosRef}
+        onDamagePlayer={onDamagePlayer}
+        alive={alive}
+      />
       <Player
         world={world}
         onBlockInteract={onBlockInteract}
         selectedBlock={selectedBlock}
         onPositionChange={onPositionChange}
         touchMode={touchMode}
+        playerPosRef={playerPosRef}
+        respawnSignal={respawnSignal}
       />
     </>
   );
@@ -84,11 +101,65 @@ export default function Game() {
   const [webglError, setWebglError] = useState(false);
   const [touchMode, setTouchMode] = useState(() => isTouchDevice());
   const [started, setStarted] = useState(false);
+  const [health, setHealth] = useState(10);
+  const [respawnSignal, setRespawnSignal] = useState(0);
+  const [showDeath, setShowDeath] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
+  const playerPosRef = useRef(new THREE.Vector3(8, 18, 8));
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const healthRef = useRef(10);
+  const aliveRef = useRef(true);
 
   useEffect(() => {
     world.setBlocks(generateHouseUpdates());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    healthRef.current = health;
+  }, [health]);
+
+  useEffect(() => {
+    aliveRef.current = !showDeath;
+  }, [showDeath]);
+
+  const handleDamagePlayer = useCallback((amount: number) => {
+    if (!aliveRef.current || healthRef.current <= 0) return;
+    const next = Math.max(0, healthRef.current - amount);
+    if (next === healthRef.current) return;
+    healthRef.current = next;
+    setHealth(next);
+    setIsFlashing(true);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => setIsFlashing(false), 250);
+    if (next <= 0) {
+      aliveRef.current = false;
+      setShowDeath(true);
+    }
+  }, []);
+
+  const handleRespawn = useCallback(() => {
+    playerPosRef.current.set(8, 18, 8);
+    healthRef.current = 10;
+    aliveRef.current = true;
+    setHealth(10);
+    setShowDeath(false);
+    setRespawnSignal(s => s + 1);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (health >= 10 || health <= 0) return;
+    const t = setInterval(() => {
+      setHealth(h => (h < 10 && h > 0 ? h + 1 : h));
+    }, 4000);
+    return () => clearInterval(t);
+  }, [health]);
 
   useEffect(() => {
     const handleLockChange = () => {
@@ -177,6 +248,10 @@ export default function Game() {
               onBlockInteract={handleBlockInteract}
               onPositionChange={handlePositionChange}
               touchMode={touchMode}
+              playerPosRef={playerPosRef}
+              respawnSignal={respawnSignal}
+              onDamagePlayer={handleDamagePlayer}
+              alive={!showDeath}
             />
           </Suspense>
         </Canvas>
@@ -190,9 +265,61 @@ export default function Game() {
         touchMode={touchMode}
         onToggleTouchMode={() => setTouchMode(t => !t)}
         onStart={() => setStarted(true)}
+        health={health}
+        maxHealth={10}
       />
 
-      <TouchControls enabled={touchMode && started} />
+      {isFlashing && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(220, 30, 30, 0.25)',
+            pointerEvents: 'none',
+            zIndex: 150,
+          }}
+        />
+      )}
+
+      {showDeath && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 300,
+            color: 'white',
+            fontFamily: 'monospace',
+            flexDirection: 'column',
+            gap: 16,
+          }}
+        >
+          <div style={{ fontSize: 40, fontWeight: 'bold', color: '#ff4d4d' }}>YOU DIED</div>
+          <div style={{ color: '#bbb' }}>The zombies got you.</div>
+          <button
+            onClick={handleRespawn}
+            style={{
+              marginTop: 12,
+              background: '#7CFC00',
+              color: '#102',
+              border: 'none',
+              borderRadius: 8,
+              padding: '12px 28px',
+              fontSize: 16,
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+            }}
+          >
+            Respawn
+          </button>
+        </div>
+      )}
+
+      <TouchControls enabled={touchMode && started && !showDeath} />
     </div>
   );
 }

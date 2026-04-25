@@ -29,6 +29,8 @@ interface PlayerProps {
   selectedBlock: BlockType;
   onPositionChange: (pos: THREE.Vector3) => void;
   touchMode: boolean;
+  playerPosRef: React.MutableRefObject<THREE.Vector3>;
+  respawnSignal: number;
 }
 
 function raycastBlocks(
@@ -91,7 +93,7 @@ function raycastBlocks(
   return { hit: false };
 }
 
-export function Player({ world, onBlockInteract, selectedBlock, onPositionChange, touchMode }: PlayerProps) {
+export function Player({ world, onBlockInteract, selectedBlock, onPositionChange, touchMode, playerPosRef, respawnSignal }: PlayerProps) {
   const { camera, gl } = useThree();
   const velocityRef = useRef(new THREE.Vector3());
   const positionRef = useRef(new THREE.Vector3(8, 18, 8));
@@ -101,6 +103,13 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
   const pitchRef = useRef(0);
   const isLockedRef = useRef(false);
   const highlightRef = useRef<THREE.Mesh>(null);
+
+  useEffect(() => {
+    if (respawnSignal === 0) return;
+    positionRef.current.set(8, 18, 8);
+    velocityRef.current.set(0, 0, 0);
+    playerPosRef.current.set(8, 18, 8);
+  }, [respawnSignal, playerPosRef]);
 
   useEffect(() => {
     if (touchMode) {
@@ -303,6 +312,7 @@ export function Player({ world, onBlockInteract, selectedBlock, onPositionChange
     }
 
     positionRef.current.copy(pos);
+    playerPosRef.current.copy(pos);
     camera.position.set(pos.x, pos.y + PLAYER_HEIGHT - 0.1, pos.z);
 
     onPositionChange(positionRef.current);
