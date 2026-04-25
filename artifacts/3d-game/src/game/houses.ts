@@ -100,6 +100,117 @@ function addStairs(
   }
 }
 
+// ── Exterior detail helpers ────────────────────────────────────────────────
+
+// Full tree: 4-block wood trunk + layered leaf canopy
+function addTree(updates: BlockUpdate[], cx: number, cz: number) {
+  const base = FLOOR_TOP_Y + 1;
+  for (let dy = 0; dy < 4; dy++) set(updates, cx, base + dy, cz, 'wood');
+  // Lower canopy (5x5 minus far corners)
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dz = -2; dz <= 2; dz++) {
+      if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+      set(updates, cx + dx, base + 4, cz + dz, 'leaves');
+    }
+  }
+  // Mid canopy (3x3)
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      set(updates, cx + dx, base + 5, cz + dz, 'leaves');
+    }
+  }
+  set(updates, cx, base + 6, cz, 'leaves');
+}
+
+// Lamp post: metal pole with arm + neon light
+function addLampPost(updates: BlockUpdate[], cx: number, cz: number, armDx: number = 0) {
+  const base = FLOOR_TOP_Y + 1;
+  for (let dy = 0; dy < 4; dy++) set(updates, cx, base + dy, cz, 'metal');
+  // Arm extending sideways
+  if (armDx !== 0) {
+    set(updates, cx + armDx, base + 3, cz, 'metal');
+    set(updates, cx + armDx, base + 4, cz, 'neon');
+  } else {
+    set(updates, cx, base + 4, cz, 'neon');
+  }
+}
+
+// Stone path from a doorstep outward in the -z direction
+function addPath(updates: BlockUpdate[], cx: number, cz: number, length: number, width: number = 1) {
+  const base = FLOOR_TOP_Y + 1;
+  const half = Math.floor(width / 2);
+  for (let i = 0; i < length; i++) {
+    for (let dx = -half; dx <= half; dx++) {
+      set(updates, cx + dx, base, cz - i, 'stone');
+    }
+  }
+}
+
+// Fireplace: stone surround + iron embers (iron is a warm orange hue)
+function addFireplace(updates: BlockUpdate[], cx: number, cz: number, baseY: number) {
+  // Embers
+  set(updates, cx, baseY, cz, 'iron');
+  set(updates, cx, baseY + 1, cz, 'iron');
+  // Stone sides
+  set(updates, cx - 1, baseY, cz, 'stone');
+  set(updates, cx + 1, baseY, cz, 'stone');
+  set(updates, cx - 1, baseY + 1, cz, 'stone');
+  set(updates, cx + 1, baseY + 1, cz, 'stone');
+  // Mantle beam
+  set(updates, cx - 1, baseY + 2, cz, 'stone');
+  set(updates, cx,     baseY + 2, cz, 'stone');
+  set(updates, cx + 1, baseY + 2, cz, 'stone');
+}
+
+// Chimney: stone column that overrides roof blocks
+function addChimney(updates: BlockUpdate[], cx: number, cz: number, fromY: number, height: number = 4) {
+  for (let dy = 0; dy < height; dy++) set(updates, cx, fromY + dy, cz, 'stone');
+  set(updates, cx, fromY + height, cz, 'iron'); // glowing "smoke" top
+}
+
+// Bookshelf: 2-wide, 2-tall wood slab
+function addBookshelf(updates: BlockUpdate[], cx: number, cz: number, baseY: number) {
+  set(updates, cx,     baseY,     cz, 'wood');
+  set(updates, cx,     baseY + 1, cz, 'wood');
+  set(updates, cx - 1, baseY,     cz, 'wood');
+  set(updates, cx - 1, baseY + 1, cz, 'wood');
+}
+
+// Dining table + two chairs: wood block table, stone chairs
+function addDiningTable(updates: BlockUpdate[], cx: number, cz: number, baseY: number) {
+  set(updates, cx, baseY, cz, 'wood');        // table
+  set(updates, cx - 1, baseY - 1, cz, 'stone'); // chair left (slightly lower)
+  set(updates, cx + 1, baseY - 1, cz, 'stone'); // chair right
+}
+
+// Garden fence: spaced stone posts around perimeter, 2 blocks above ground
+function addFence(updates: BlockUpdate[], cx: number, cz: number, w: number, d: number, spacing: number = 2) {
+  const base = FLOOR_TOP_Y + 1;
+  for (let dx = -w; dx <= w; dx += spacing) {
+    set(updates, cx + dx, base, cz - d - 1, 'stone');
+    set(updates, cx + dx, base, cz + d + 1, 'stone');
+  }
+  for (let dz = -d; dz <= d; dz += spacing) {
+    set(updates, cx - w - 1, base, cz + dz, 'stone');
+    set(updates, cx + w + 1, base, cz + dz, 'stone');
+  }
+}
+
+// Flower bed: leaves blocks at ground level outside a wall section
+function addFlowerBox(updates: BlockUpdate[], cx: number, cz: number) {
+  const base = FLOOR_TOP_Y + 1;
+  set(updates, cx - 1, base, cz, 'leaves');
+  set(updates, cx,     base, cz, 'leaves');
+  set(updates, cx + 1, base, cz, 'leaves');
+}
+
+// Stone bench: two stone blocks side by side
+function addBench(updates: BlockUpdate[], cx: number, cz: number) {
+  const base = FLOOR_TOP_Y + 1;
+  set(updates, cx,     base, cz, 'stone');
+  set(updates, cx + 1, base, cz, 'stone');
+}
+
 // ── Cottage ────────────────────────────────────────────────────────────────
 // Single-storey wood cottage with pitched roof.
 // Interior: kitchen (back-left) + bathroom (back-right).
@@ -139,11 +250,40 @@ function buildCottage(updates: BlockUpdate[], cx: number, cz: number) {
   // Interior: kitchen at back-left, bathroom at back-right
   addKitchen(updates, cx - 2, cz + 2, baseY);
   addBathroom(updates, cx + 2, cz + 2, baseY);
+  // Fireplace on back-center wall
+  addFireplace(updates, cx, cz + 3, baseY);
+  // Bookshelf against left wall
+  addBookshelf(updates, cx - 2, cz, baseY);
+  // Dining table in the middle
+  addDiningTable(updates, cx + 1, cz, baseY);
+
   // Interactive: door in doorway, chest near left wall, bed in front-right area
   set(updates, cx, baseY, cz - d, 'door');
   set(updates, cx, baseY + 1, cz - d, 'door');
   set(updates, cx - 3, baseY, cz - 2, 'chest');
   set(updates, cx + 2, baseY, cz - 2, 'bed');
+
+  // Chimney: rises from back-center wall through roof
+  addChimney(updates, cx, cz + d, baseY + height, 5);
+
+  // Garden fence around perimeter
+  addFence(updates, cx, cz, w + 1, d + 1, 2);
+
+  // Stone path from doorstep
+  addPath(updates, cx, cz - d - 1, 5, 3);
+
+  // Lamp posts flanking the path
+  addLampPost(updates, cx - 3, cz - d - 3, 1);
+  addLampPost(updates, cx + 3, cz - d - 3, -1);
+
+  // Trees to the sides
+  addTree(updates, cx - 7, cz);
+  addTree(updates, cx + 7, cz);
+  addTree(updates, cx - 5, cz + 6);
+
+  // Window flower boxes on exterior
+  addFlowerBox(updates, cx - w - 1, cz + 0);
+  addFlowerBox(updates, cx + w + 1, cz + 0);
 }
 
 // ── Cabin ──────────────────────────────────────────────────────────────────
@@ -232,12 +372,40 @@ function buildCabin(updates: BlockUpdate[], cx: number, cz: number) {
   // ── Second floor interior: bathroom ──
   addBathroom(updates, cx + 3, cz + 4, f2Base + 1);
 
+  // ── Ground floor interior extras ──
+  addFireplace(updates, cx - 3, cz + 5, baseY);
+  addBookshelf(updates, cx + 3, cz + 5, baseY);
+  addDiningTable(updates, cx, cz + 2, baseY);
+
   // Interactive: front door, chest on ground floor, bed on second floor
   set(updates, cx, baseY, cz - d, 'door');
   set(updates, cx, baseY + 1, cz - d, 'door');
   set(updates, cx - 4, baseY, cz - 4, 'chest');
   set(updates, cx - 4, f2Base + 1, cz - 4, 'bed');
   set(updates, cx - 3, f2Base + 1, cz - 4, 'bed');
+
+  // Chimney from side of cabin
+  addChimney(updates, cx - w, cz + 3, baseY + floor1H, 8);
+
+  // Stone path from front door outward
+  addPath(updates, cx, cz - d - 1, 6, 3);
+
+  // Lamp posts at entrance
+  addLampPost(updates, cx - 4, cz - d - 3, 1);
+  addLampPost(updates, cx + 4, cz - d - 3, -1);
+
+  // Trees around the cabin
+  addTree(updates, cx - 9, cz - 4);
+  addTree(updates, cx + 9, cz + 4);
+  addTree(updates, cx, cz + 10);
+
+  // Flower boxes on side windows
+  addFlowerBox(updates, cx - w - 1, cz - 2);
+  addFlowerBox(updates, cx + w + 1, cz + 2);
+
+  // Benches near entrance
+  addBench(updates, cx - 6, cz - d - 1);
+  addBench(updates, cx + 4, cz - d - 1);
 }
 
 // ── Modern ─────────────────────────────────────────────────────────────────
@@ -329,6 +497,29 @@ function buildModern(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx - 4, baseY, cz + 2, 'chest');
   set(updates, cx - 4, f2Base + 1, cz + 2, 'bed');
   set(updates, cx - 3, f2Base + 1, cz + 2, 'bed');
+
+  // Dining area on ground floor
+  addDiningTable(updates, cx - 2, cz - 1, baseY);
+  addBookshelf(updates, cx - 4, cz + 2, baseY);
+
+  // Wide stone driveway / plaza in front
+  addPath(updates, cx, cz - d - 1, 6, 5);
+
+  // Lamp posts flanking driveway
+  addLampPost(updates, cx - 5, cz - d - 4, 1);
+  addLampPost(updates, cx + 5, cz - d - 4, -1);
+
+  // Decorative hedge bushes at front corners
+  addFlowerBox(updates, cx - w - 1, cz - d);
+  addFlowerBox(updates, cx + w - 1, cz - d);
+
+  // Trees to the rear
+  addTree(updates, cx - 8, cz + 6);
+  addTree(updates, cx + 8, cz + 6);
+
+  // Benches near front path
+  addBench(updates, cx - 7, cz - d - 2);
+  addBench(updates, cx + 5, cz - d - 2);
 }
 
 // ── Futuristic ─────────────────────────────────────────────────────────────
@@ -387,6 +578,27 @@ function buildFuturistic(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx, baseY + 1, cz - d, 'door');
   set(updates, cx - 2, baseY + 1, cz - 2, 'chest');
   set(updates, cx - 2, baseY + 1, cz + 0, 'bed');
+
+  // Circular neon-lit plaza in front
+  for (let dx = -4; dx <= 4; dx++) {
+    for (let dz = -4; dz <= 0; dz++) {
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist <= 4) set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+    }
+  }
+
+  // Neon lamp posts on plaza perimeter
+  addLampPost(updates, cx - 5, cz - 1, 1);
+  addLampPost(updates, cx + 5, cz - 1, -1);
+  addLampPost(updates, cx, cz - 6, 0);
+
+  // Trees behind the pod
+  addTree(updates, cx - 7, cz + 5);
+  addTree(updates, cx + 7, cz + 5);
+
+  // Benches on the plaza
+  addBench(updates, cx - 3, cz - 4);
+  addBench(updates, cx + 2, cz - 4);
 }
 
 // ── Tower ──────────────────────────────────────────────────────────────────
@@ -446,6 +658,28 @@ function buildTower(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx - 2, baseY + 1, cz + 1, 'chest');
   set(updates, cx - 2, baseY + 4, cz + 1, 'bed');
   set(updates, cx - 2, baseY + 7, cz + 1, 'chest');
+
+  // Stone plaza surrounding the base
+  for (let dx = -w - 2; dx <= w + 2; dx++) {
+    for (let dz = -d - 3; dz <= d + 2; dz++) {
+      if (Math.abs(dx) <= w && Math.abs(dz) <= d) continue; // skip building footprint
+      set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+    }
+  }
+
+  // Lamp posts at plaza corners
+  addLampPost(updates, cx - w - 2, cz - d - 2, 1);
+  addLampPost(updates, cx + w + 2, cz - d - 2, -1);
+  addLampPost(updates, cx - w - 2, cz + d + 1, 1);
+  addLampPost(updates, cx + w + 2, cz + d + 1, -1);
+
+  // Trees around the plaza
+  addTree(updates, cx - 7, cz);
+  addTree(updates, cx + 7, cz);
+
+  // Benches on the plaza
+  addBench(updates, cx - 5, cz - d - 2);
+  addBench(updates, cx + 4, cz - d - 2);
 }
 
 // ── Skyscraper ─────────────────────────────────────────────────────────────
@@ -551,6 +785,39 @@ function buildSkyscraper(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx - 2, baseY + 5, cz - 2, 'chest');
   set(updates, cx - 2, baseY + 9, cz - 2, 'chest');
   set(updates, cx - 2, baseY + 13, cz - 2, 'chest');
+
+  // Large stone grand plaza
+  for (let dx = -w - 4; dx <= w + 4; dx++) {
+    for (let dz = -d - 6; dz <= d + 4; dz++) {
+      if (Math.abs(dx) <= w && Math.abs(dz) <= d) continue;
+      set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+    }
+  }
+  // Paving accent stripes (concrete strip in plaza)
+  for (let dx = -w - 4; dx <= w + 4; dx++) {
+    set(updates, cx + dx, FLOOR_TOP_Y + 1, cz - d - 3, 'concrete');
+    set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + d + 2, 'concrete');
+  }
+
+  // Eight lamp posts around plaza
+  for (const side of [-1, 1]) {
+    addLampPost(updates, cx + side * (w + 4), cz - d - 4, -side);
+    addLampPost(updates, cx + side * (w + 4), cz - d - 1, -side);
+    addLampPost(updates, cx + side * (w + 4), cz + d + 2, -side);
+    addLampPost(updates, cx + side * (w + 1), cz - d - 5, 0);
+  }
+
+  // Trees flanking plaza
+  addTree(updates, cx - w - 6, cz - d - 2);
+  addTree(updates, cx + w + 6, cz - d - 2);
+  addTree(updates, cx - w - 6, cz + d + 3);
+  addTree(updates, cx + w + 6, cz + d + 3);
+
+  // Lobby benches
+  addBench(updates, cx - 4, cz - d - 4);
+  addBench(updates, cx + 3, cz - d - 4);
+  addBench(updates, cx - 4, cz + d + 3);
+  addBench(updates, cx + 3, cz + d + 3);
 }
 
 // ── Apartment ──────────────────────────────────────────────────────────────
@@ -681,4 +948,32 @@ function buildApartment(updates: BlockUpdate[], cx: number, cz: number) {
   // Third floor: chests with extra loot
   set(updates, cx - 5, baseY + floorHeight * 2 + 1, cz - 3, 'chest');
   set(updates, cx + 4, baseY + floorHeight * 2 + 1, cz - 3, 'chest');
+
+  // Courtyard / front plaza
+  for (let dx = -w - 2; dx <= w + 2; dx++) {
+    for (let dz = -d - 5; dz <= -d - 1; dz++) {
+      set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+    }
+  }
+
+  // Lamp posts on courtyard
+  addLampPost(updates, cx - w - 2, cz - d - 4, 1);
+  addLampPost(updates, cx + w + 2, cz - d - 4, -1);
+  addLampPost(updates, cx - 2, cz - d - 5, 0);
+  addLampPost(updates, cx + 2, cz - d - 5, 0);
+
+  // Trees flanking courtyard
+  addTree(updates, cx - w - 4, cz - d - 2);
+  addTree(updates, cx + w + 4, cz - d - 2);
+  addTree(updates, cx - w - 4, cz + d + 3);
+  addTree(updates, cx + w + 4, cz + d + 3);
+
+  // Courtyard benches
+  addBench(updates, cx - 5, cz - d - 3);
+  addBench(updates, cx + 4, cz - d - 3);
+
+  // Flower boxes below each unit's ground-floor window
+  addFlowerBox(updates, cx - 6, cz - d - 1);
+  addFlowerBox(updates, cx,     cz - d - 1);
+  addFlowerBox(updates, cx + 5, cz - d - 1);
 }
