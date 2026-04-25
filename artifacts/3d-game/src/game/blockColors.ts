@@ -13,6 +13,10 @@ export const BLOCK_COLORS: Record<BlockType, string> = {
   coal: '#2A2A2A',
   iron: '#C87137',
   bedrock: '#1A1A1A',
+  glass: '#A8D8E8',
+  metal: '#B0B8C0',
+  concrete: '#D8D5CE',
+  neon: '#39FFCB',
 };
 
 export const BLOCK_TOP_COLORS: Record<BlockType, string> = {
@@ -28,15 +32,21 @@ export const BLOCK_TOP_COLORS: Record<BlockType, string> = {
   coal: '#333333',
   iron: '#D4844A',
   bedrock: '#222222',
+  glass: '#BFE3F0',
+  metal: '#C8D0D8',
+  concrete: '#E5E2DC',
+  neon: '#5BFFE0',
 };
 
 export const BLOCK_EMISSIVE: Partial<Record<BlockType, string>> = {
   water: '#0A3D6E',
+  neon: '#1FFFB0',
 };
 
 export const BLOCK_OPACITY: Partial<Record<BlockType, number>> = {
   water: 0.7,
   leaves: 0.9,
+  glass: 0.35,
 };
 
 export const BLOCK_NAMES: Record<BlockType, string> = {
@@ -52,8 +62,14 @@ export const BLOCK_NAMES: Record<BlockType, string> = {
   coal: 'Coal Ore',
   iron: 'Iron Ore',
   bedrock: 'Bedrock',
+  glass: 'Glass',
+  metal: 'Metal',
+  concrete: 'Concrete',
+  neon: 'Neon',
 };
 
+export const TRANSPARENT_BLOCKS: Set<BlockType> = new Set(['water', 'glass']);
+
 export const PLACEABLE_BLOCKS: BlockType[] = [
-  'dirt', 'stone', 'wood', 'leaves', 'sand', 'grass', 'snow',
+  'dirt', 'stone', 'wood', 'glass', 'concrete', 'metal', 'neon', 'leaves',
 ];

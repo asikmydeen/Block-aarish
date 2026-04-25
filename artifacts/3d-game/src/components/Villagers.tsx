@@ -131,9 +131,10 @@ export function Villagers({ world }: VillagersProps) {
           [Math.floor(reachX), Math.floor(v.pos.y) + 1, Math.floor(reachZ)],
           [Math.floor(v.pos.x), Math.floor(v.pos.y) - 1, Math.floor(v.pos.z)],
         ];
+        const PROTECTED: Set<string> = new Set(['bedrock', 'glass', 'metal', 'concrete', 'neon', 'wood']);
         for (const [bx, by, bz] of candidates) {
           const block = world.getBlock(bx, by, bz);
-          if (block && block !== 'air' && block !== 'water' && block !== 'bedrock') {
+          if (block && block !== 'air' && block !== 'water' && !PROTECTED.has(block)) {
             world.setBlock(bx, by, bz, 'air');
             break;
           }

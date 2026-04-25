@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { BlockType } from '../game/terrain';
-import { BLOCK_COLORS, BLOCK_TOP_COLORS } from '../game/blockColors';
+import { BLOCK_COLORS, BLOCK_TOP_COLORS, BLOCK_OPACITY, TRANSPARENT_BLOCKS } from '../game/blockColors';
 
 interface ChunkMeshProps {
   chunkX: number;
@@ -27,28 +27,31 @@ const FACES = [
 ];
 
 export function ChunkMesh({ chunkX, chunkZ, blocks, onPointerDown }: ChunkMeshProps) {
-  const { geometry, waterGeometry } = useMemo(() => {
+  const { geometry, transparentGeometry, transparentOpacity } = useMemo(() => {
     const positions: number[] = [];
     const colors: number[] = [];
     const indices: number[] = [];
     const normals: number[] = [];
-    const faceData: { wx: number; wy: number; wz: number; normal: [number,number,number] }[] = [];
 
-    const wPositions: number[] = [];
-    const wColors: number[] = [];
-    const wIndices: number[] = [];
-    const wNormals: number[] = [];
+    const tPositions: number[] = [];
+    const tColors: number[] = [];
+    const tIndices: number[] = [];
+    const tNormals: number[] = [];
+    let tOpacity = 0.5;
 
-    function isVisible(lx: number, ly: number, lz: number): boolean {
+    function isOpaque(lx: number, ly: number, lz: number): boolean {
       if (lx < 0 || lx >= CHUNK_SIZE || ly < 0 || lz < 0 || lz >= CHUNK_SIZE) return false;
       const bt = blocks.get(`${lx},${ly},${lz}`);
-      return !bt || bt === 'air' || bt === 'water' || bt === 'leaves';
+      if (!bt || bt === 'air') return false;
+      if (bt === 'leaves') return false;
+      if (TRANSPARENT_BLOCKS.has(bt)) return false;
+      return true;
     }
 
-    function isAir(lx: number, ly: number, lz: number): boolean {
-      if (lx < 0 || lx >= CHUNK_SIZE || ly < 0 || lz < 0 || lz >= CHUNK_SIZE) return true;
+    function neighborSameTransparent(lx: number, ly: number, lz: number, type: BlockType): boolean {
+      if (lx < 0 || lx >= CHUNK_SIZE || ly < 0 || lz < 0 || lz >= CHUNK_SIZE) return false;
       const bt = blocks.get(`${lx},${ly},${lz}`);
-      return !bt || bt === 'air';
+      return bt === type;
     }
 
     for (const [key, blockType] of blocks) {
@@ -60,20 +63,27 @@ export function ChunkMesh({ chunkX, chunkZ, blocks, onPointerDown }: ChunkMeshPr
       const wx = chunkX * CHUNK_SIZE + lx;
       const wz = chunkZ * CHUNK_SIZE + lz;
 
-      const isWater = blockType === 'water';
-      const targetPositions = isWater ? wPositions : positions;
-      const targetColors = isWater ? wColors : colors;
-      const targetIndices = isWater ? wIndices : indices;
-      const targetNormals = isWater ? wNormals : normals;
+      const isTransparent = TRANSPARENT_BLOCKS.has(blockType);
+      if (isTransparent) {
+        const o = BLOCK_OPACITY[blockType];
+        if (typeof o === 'number') tOpacity = o;
+      }
+      const targetPositions = isTransparent ? tPositions : positions;
+      const targetColors = isTransparent ? tColors : colors;
+      const targetIndices = isTransparent ? tIndices : indices;
+      const targetNormals = isTransparent ? tNormals : normals;
 
       for (const { dir, corners, face } of FACES) {
         const nx = lx + dir[0];
         const ny = ly + dir[1];
         const nz = lz + dir[2];
 
-        const shouldDraw = isWater
-          ? isAir(nx, ny, nz)
-          : isVisible(nx, ny, nz);
+        let shouldDraw: boolean;
+        if (isTransparent) {
+          shouldDraw = !isOpaque(nx, ny, nz) && !neighborSameTransparent(nx, ny, nz, blockType);
+        } else {
+          shouldDraw = !isOpaque(nx, ny, nz);
+        }
 
         if (!shouldDraw) continue;
 
@@ -87,11 +97,6 @@ export function ChunkMesh({ chunkX, chunkZ, blocks, onPointerDown }: ChunkMeshPr
         }
 
         targetIndices.push(ndx, ndx + 1, ndx + 2, ndx, ndx + 2, ndx + 3);
-
-        if (!isWater) {
-          faceData.push({ wx, wy: ly, wz, normal: dir as [number,number,number] });
-          faceData.push({ wx, wy: ly, wz, normal: dir as [number,number,number] });
-        }
       }
     }
 
@@ -101,16 +106,15 @@ export function ChunkMesh({ chunkX, chunkZ, blocks, onPointerDown }: ChunkMeshPr
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
     geo.setIndex(indices);
     geo.computeBoundingSphere();
-    (geo as any).__faceData = faceData;
 
-    const wGeo = new THREE.BufferGeometry();
-    wGeo.setAttribute('position', new THREE.Float32BufferAttribute(wPositions, 3));
-    wGeo.setAttribute('color', new THREE.Float32BufferAttribute(wColors, 3));
-    wGeo.setAttribute('normal', new THREE.Float32BufferAttribute(wNormals, 3));
-    wGeo.setIndex(wIndices);
-    wGeo.computeBoundingSphere();
+    const tGeo = new THREE.BufferGeometry();
+    tGeo.setAttribute('position', new THREE.Float32BufferAttribute(tPositions, 3));
+    tGeo.setAttribute('color', new THREE.Float32BufferAttribute(tColors, 3));
+    tGeo.setAttribute('normal', new THREE.Float32BufferAttribute(tNormals, 3));
+    tGeo.setIndex(tIndices);
+    tGeo.computeBoundingSphere();
 
-    return { geometry: geo, waterGeometry: wGeo };
+    return { geometry: geo, transparentGeometry: tGeo, transparentOpacity: tOpacity };
   }, [chunkX, chunkZ, blocks]);
 
   return (
@@ -123,14 +127,15 @@ export function ChunkMesh({ chunkX, chunkZ, blocks, onPointerDown }: ChunkMeshPr
         <meshLambertMaterial vertexColors side={THREE.FrontSide} />
       </mesh>
       <mesh
-        geometry={waterGeometry}
+        geometry={transparentGeometry}
         renderOrder={1}
       >
         <meshLambertMaterial
           vertexColors
           transparent
-          opacity={0.65}
+          opacity={transparentOpacity}
           side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
     </group>
