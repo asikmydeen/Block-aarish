@@ -136,8 +136,9 @@ function addLampPost(updates: BlockUpdate[], cx: number, cz: number, armDx: numb
 }
 
 // Stone path from a doorstep outward in the -z direction
+// Placed at FLOOR_TOP_Y (terrain surface) so the player walks ON it, not into it
 function addPath(updates: BlockUpdate[], cx: number, cz: number, length: number, width: number = 1) {
-  const base = FLOOR_TOP_Y + 1;
+  const base = FLOOR_TOP_Y; // terrain surface level — walkable
   const half = Math.floor(width / 2);
   for (let i = 0; i < length; i++) {
     for (let dx = -half; dx <= half; dx++) {
@@ -183,30 +184,43 @@ function addDiningTable(updates: BlockUpdate[], cx: number, cz: number, baseY: n
   set(updates, cx + 1, baseY - 1, cz, 'stone'); // chair right
 }
 
-// Garden fence: spaced stone posts around perimeter, 2 blocks above ground
-function addFence(updates: BlockUpdate[], cx: number, cz: number, w: number, d: number, spacing: number = 2) {
-  const base = FLOOR_TOP_Y + 1;
+// Garden fence: spaced stone posts around perimeter.
+// Front side leaves a gap (frontGap blocks on each side of centre) for the door.
+function addFence(
+  updates: BlockUpdate[],
+  cx: number, cz: number,
+  w: number, d: number,
+  spacing: number = 2,
+  frontGap: number = 3
+) {
+  const base = FLOOR_TOP_Y + 1; // fence posts rise up from ground — solid obstacles to walk around
+  // Front fence: skip posts within frontGap of the door
   for (let dx = -w; dx <= w; dx += spacing) {
+    if (Math.abs(dx) <= frontGap) continue;
     set(updates, cx + dx, base, cz - d - 1, 'stone');
+  }
+  // Back fence
+  for (let dx = -w; dx <= w; dx += spacing) {
     set(updates, cx + dx, base, cz + d + 1, 'stone');
   }
+  // Side fences
   for (let dz = -d; dz <= d; dz += spacing) {
     set(updates, cx - w - 1, base, cz + dz, 'stone');
     set(updates, cx + w + 1, base, cz + dz, 'stone');
   }
 }
 
-// Flower bed: leaves blocks at ground level outside a wall section
+// Flower bed: leaves at terrain surface so the player walks over them, not into them
 function addFlowerBox(updates: BlockUpdate[], cx: number, cz: number) {
-  const base = FLOOR_TOP_Y + 1;
+  const base = FLOOR_TOP_Y; // terrain surface level
   set(updates, cx - 1, base, cz, 'leaves');
   set(updates, cx,     base, cz, 'leaves');
   set(updates, cx + 1, base, cz, 'leaves');
 }
 
-// Stone bench: two stone blocks side by side
+// Stone bench: placed at terrain surface so the player walks over, not into
 function addBench(updates: BlockUpdate[], cx: number, cz: number) {
-  const base = FLOOR_TOP_Y + 1;
+  const base = FLOOR_TOP_Y; // terrain surface level
   set(updates, cx,     base, cz, 'stone');
   set(updates, cx + 1, base, cz, 'stone');
 }
@@ -579,11 +593,11 @@ function buildFuturistic(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx - 2, baseY + 1, cz - 2, 'chest');
   set(updates, cx - 2, baseY + 1, cz + 0, 'bed');
 
-  // Circular neon-lit plaza in front
+  // Circular neon-lit plaza in front (at terrain surface — walkable)
   for (let dx = -4; dx <= 4; dx++) {
     for (let dz = -4; dz <= 0; dz++) {
       const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist <= 4) set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+      if (dist <= 4) set(updates, cx + dx, FLOOR_TOP_Y, cz + dz, 'stone');
     }
   }
 
@@ -659,11 +673,11 @@ function buildTower(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx - 2, baseY + 4, cz + 1, 'bed');
   set(updates, cx - 2, baseY + 7, cz + 1, 'chest');
 
-  // Stone plaza surrounding the base
+  // Stone plaza surrounding the base (at terrain surface so it's walkable)
   for (let dx = -w - 2; dx <= w + 2; dx++) {
     for (let dz = -d - 3; dz <= d + 2; dz++) {
       if (Math.abs(dx) <= w && Math.abs(dz) <= d) continue; // skip building footprint
-      set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+      set(updates, cx + dx, FLOOR_TOP_Y, cz + dz, 'stone');
     }
   }
 
@@ -786,17 +800,17 @@ function buildSkyscraper(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx - 2, baseY + 9, cz - 2, 'chest');
   set(updates, cx - 2, baseY + 13, cz - 2, 'chest');
 
-  // Large stone grand plaza
+  // Large stone grand plaza (at terrain surface — walkable)
   for (let dx = -w - 4; dx <= w + 4; dx++) {
     for (let dz = -d - 6; dz <= d + 4; dz++) {
       if (Math.abs(dx) <= w && Math.abs(dz) <= d) continue;
-      set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+      set(updates, cx + dx, FLOOR_TOP_Y, cz + dz, 'stone');
     }
   }
   // Paving accent stripes (concrete strip in plaza)
   for (let dx = -w - 4; dx <= w + 4; dx++) {
-    set(updates, cx + dx, FLOOR_TOP_Y + 1, cz - d - 3, 'concrete');
-    set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + d + 2, 'concrete');
+    set(updates, cx + dx, FLOOR_TOP_Y, cz - d - 3, 'concrete');
+    set(updates, cx + dx, FLOOR_TOP_Y, cz + d + 2, 'concrete');
   }
 
   // Eight lamp posts around plaza
@@ -949,10 +963,10 @@ function buildApartment(updates: BlockUpdate[], cx: number, cz: number) {
   set(updates, cx - 5, baseY + floorHeight * 2 + 1, cz - 3, 'chest');
   set(updates, cx + 4, baseY + floorHeight * 2 + 1, cz - 3, 'chest');
 
-  // Courtyard / front plaza
+  // Courtyard / front plaza (at terrain surface — walkable)
   for (let dx = -w - 2; dx <= w + 2; dx++) {
     for (let dz = -d - 5; dz <= -d - 1; dz++) {
-      set(updates, cx + dx, FLOOR_TOP_Y + 1, cz + dz, 'stone');
+      set(updates, cx + dx, FLOOR_TOP_Y, cz + dz, 'stone');
     }
   }
 
