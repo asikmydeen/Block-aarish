@@ -299,12 +299,12 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
         let steer = 0;
         if (touchMode) {
           throttle = Math.abs(touchState.moveY) > 0.1 ? touchState.moveY : 0;
-          steer = Math.abs(touchState.moveX) > 0.1 ? -touchState.moveX : 0;
+          steer = Math.abs(touchState.moveX) > 0.1 ? touchState.moveX : 0;
         } else {
           if (controls.forward) throttle = 1;
           else if (controls.back) throttle = -0.6;
-          if (controls.left) steer = 1;
-          else if (controls.right) steer = -1;
+          if (controls.left) steer = -1;
+          else if (controls.right) steer = 1;
         }
         if (broken) throttle = 0;
 
