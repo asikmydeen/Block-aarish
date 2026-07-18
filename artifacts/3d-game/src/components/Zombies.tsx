@@ -117,8 +117,12 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
       const z = best.z;
       z.health -= damage;
       z.hitTimer = 0.2;
-      z.pos.x += dir.x * 0.6;
-      z.pos.z += dir.z * 0.6;
+      const kx = z.pos.x + dir.x * 0.6;
+      const kz = z.pos.z + dir.z * 0.6;
+      if (!isSolid(world, kx, z.pos.y, kz) && !isSolid(world, kx, z.pos.y + 1, kz)) {
+        z.pos.x = kx;
+        z.pos.z = kz;
+      }
       if (z.health <= 0) {
         z.dead = true;
         z.respawnTimer = 8;
