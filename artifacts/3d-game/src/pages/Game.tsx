@@ -13,6 +13,7 @@ import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS } from '../game/blockColors';
 import { generateHouseUpdates } from '../game/houses';
 import { ChestUI, Toast, LootItem, generateLoot } from '../components/InteractionUI';
+import { WEAPONS, type WeaponType } from '../game/combat';
 
 enum Controls {
   forward = 'forward',
@@ -41,6 +42,7 @@ function GameScene({
   respawnSignal,
   onDamagePlayer,
   alive,
+  weapon,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
@@ -52,6 +54,7 @@ function GameScene({
   respawnSignal: number;
   onDamagePlayer: (amount: number) => void;
   alive: boolean;
+  weapon: WeaponType;
 }) {
   return (
     <>
@@ -92,6 +95,7 @@ function GameScene({
         touchMode={touchMode}
         playerPosRef={playerPosRef}
         respawnSignal={respawnSignal}
+        weapon={weapon}
       />
     </>
   );
@@ -100,6 +104,7 @@ function GameScene({
 export default function Game() {
   const world = useWorld();
   const [selectedBlock, setSelectedBlock] = useState<BlockType>('dirt');
+  const [weapon, setWeapon] = useState<WeaponType>('hand');
   const [playerPos, setPlayerPos] = useState(() => new THREE.Vector3(8, 18, 8));
   const [isLocked, setIsLocked] = useState(false);
   const [webglError, setWebglError] = useState(false);
@@ -209,6 +214,12 @@ export default function Game() {
       if (num >= 1 && num <= PLACEABLE_BLOCKS.length) {
         setSelectedBlock(PLACEABLE_BLOCKS[num - 1]);
       }
+      if (e.key === 'q' || e.key === 'Q') {
+        setWeapon(w => {
+          const idx = WEAPONS.findIndex(spec => spec.id === w);
+          return WEAPONS[(idx + 1) % WEAPONS.length].id;
+        });
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
@@ -287,6 +298,7 @@ export default function Game() {
               respawnSignal={respawnSignal}
               onDamagePlayer={handleDamagePlayer}
               alive={!showDeath}
+              weapon={weapon}
             />
           </Suspense>
         </Canvas>
@@ -302,6 +314,8 @@ export default function Game() {
         onStart={() => setStarted(true)}
         health={health}
         maxHealth={10}
+        weapon={weapon}
+        onSelectWeapon={setWeapon}
       />
 
       {isFlashing && (

@@ -1,7 +1,8 @@
-import { useRef, type MutableRefObject } from 'react';
+import { useRef, useEffect, type MutableRefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
+import { combatRegistry } from '../game/combat';
 
 interface ZombieData {
   id: number;
@@ -12,6 +13,10 @@ interface ZombieData {
   walking: boolean;
   speed: number;
   attacking: boolean;
+  health: number;
+  dead: boolean;
+  respawnTimer: number;
+  hitTimer: number;
 }
 
 const FLOOR_TOP_Y = 12;
@@ -56,6 +61,10 @@ function createZombies(): ZombieData[] {
     walking: true,
     speed: 1.4 + Math.random() * 0.8,
     attacking: false,
+    health: 5,
+    dead: false,
+    respawnTimer: 0,
+    hitTimer: 0,
   }));
 }
 
@@ -78,6 +87,49 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
     zombies.map(() => ({ leftArm: null, rightArm: null, leftLeg: null, rightLeg: null }))
   );
 
+  useEffect(() => {
+    const firstBlockT = (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number): number => {
+      const step = 0.2;
+      const p = new THREE.Vector3();
+      for (let t = step; t <= maxDist; t += step) {
+        p.copy(origin).addScaledVector(dir, t);
+        if (isSolid(world, p.x, p.y, p.z)) return t;
+      }
+      return Infinity;
+    };
+
+    combatRegistry.hitZombies = (origin, dir, maxDist, damage) => {
+      let best: { z: ZombieData; t: number } | null = null;
+      for (const z of zombies) {
+        if (z.dead) continue;
+        const center = new THREE.Vector3(z.pos.x, z.pos.y + 1.0, z.pos.z);
+        const toC = center.clone().sub(origin);
+        const t = toC.dot(dir);
+        if (t < 0 || t > maxDist) continue;
+        const closest = origin.clone().addScaledVector(dir, t);
+        if (closest.distanceToSquared(center) < 0.85 * 0.85) {
+          if (!best || t < best.t) best = { z, t };
+        }
+      }
+      if (!best) return null;
+      // Occlusion: a solid block between the player and the zombie stops the attack
+      if (firstBlockT(origin, dir, best.t) < best.t) return null;
+      const z = best.z;
+      z.health -= damage;
+      z.hitTimer = 0.2;
+      z.pos.x += dir.x * 0.6;
+      z.pos.z += dir.z * 0.6;
+      if (z.health <= 0) {
+        z.dead = true;
+        z.respawnTimer = 8;
+      }
+      return new THREE.Vector3(z.pos.x, z.pos.y + 1.0, z.pos.z);
+    };
+    return () => {
+      combatRegistry.hitZombies = null;
+    };
+  }, [zombies, world]);
+
   useFrame((_, delta) => {
     if (!playerPosRef?.current) return;
     const dt = Math.min(delta, 0.1);
@@ -86,6 +138,31 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
 
     for (let i = 0; i < zombies.length; i++) {
       const z = zombies[i];
+      const g0 = groupRefs.current[i];
+
+      if (z.dead) {
+        z.respawnTimer -= dt;
+        if (g0) {
+          // fall over then hide
+          if (z.respawnTimer > 7) {
+            g0.visible = true;
+            g0.rotation.z = Math.min(Math.PI / 2, (8 - z.respawnTimer) * 5);
+          } else {
+            g0.visible = false;
+          }
+        }
+        if (z.respawnTimer <= 0) {
+          const sp = SPAWN_POINTS[z.id % SPAWN_POINTS.length];
+          z.pos.set(sp[0], FLOOR_TOP_Y + 1, sp[1]);
+          z.health = 5;
+          z.dead = false;
+          z.hitTimer = 0;
+          z.attackCooldown = 1;
+        }
+        continue;
+      }
+      if (g0 && !g0.visible) g0.visible = true;
+      z.hitTimer = Math.max(0, z.hitTimer - dt);
 
       const dx = player.x - z.pos.x;
       const dz = player.z - z.pos.z;
@@ -141,6 +218,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
       if (g) {
         g.position.set(z.pos.x, z.pos.y, z.pos.z);
         g.rotation.y = -z.dir + Math.PI / 2;
+        g.rotation.z = z.hitTimer > 0 ? 0.25 : 0;
       }
 
       const limbs = limbRefs.current[i];

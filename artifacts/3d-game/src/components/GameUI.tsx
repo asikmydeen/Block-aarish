@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { BlockType } from '../game/terrain';
 import { BLOCK_COLORS, BLOCK_NAMES, PLACEABLE_BLOCKS } from '../game/blockColors';
+import { WEAPONS, type WeaponType } from '../game/combat';
 import * as THREE from 'three';
+
+const WEAPON_ICONS: Record<WeaponType, string> = {
+  hand: '✊',
+  sword: '🗡️',
+  blaster: '🔫',
+};
 
 interface GameUIProps {
   selectedBlock: BlockType;
@@ -13,6 +20,8 @@ interface GameUIProps {
   onStart: () => void;
   health: number;
   maxHealth: number;
+  weapon: WeaponType;
+  onSelectWeapon: (w: WeaponType) => void;
 }
 
 function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
@@ -35,7 +44,7 @@ function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
   );
 }
 
-export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth }: GameUIProps) {
+export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon }: GameUIProps) {
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -142,6 +151,65 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
         ))}
       </div>
 
+      {/* Weapon selector */}
+      <div style={{
+        position: 'fixed',
+        bottom: 20,
+        right: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        zIndex: 100,
+        background: 'rgba(0,0,0,0.5)',
+        padding: '6px 8px',
+        borderRadius: 8,
+        backdropFilter: 'blur(4px)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        alignItems: 'center',
+      }}>
+        <div style={{
+          color: 'rgba(255,255,255,0.7)',
+          fontSize: 10,
+          fontFamily: 'monospace',
+        }}>
+          [Q] Weapon
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {WEAPONS.map(w => (
+            <div
+              key={w.id}
+              onClick={() => onSelectWeapon(w.id)}
+              title={w.name}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 6,
+                border: weapon === w.id
+                  ? '2px solid #ffd24d'
+                  : '2px solid rgba(255,255,255,0.25)',
+                background: weapon === w.id ? 'rgba(255,210,77,0.15)' : 'rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+                transition: 'transform 0.1s',
+                transform: weapon === w.id ? 'scale(1.1)' : 'scale(1)',
+              }}
+            >
+              {WEAPON_ICONS[w.id]}
+            </div>
+          ))}
+        </div>
+        <div style={{
+          color: '#ffd24d',
+          fontSize: 11,
+          fontFamily: 'monospace',
+        }}>
+          {WEAPONS.find(w => w.id === weapon)?.name}
+        </div>
+      </div>
+
       {/* Selected block label */}
       <div style={{
         position: 'fixed',
@@ -244,18 +312,20 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>Joystick — Move</div>
               <div>Drag right — Look</div>
               <div>JUMP button — Jump</div>
-              <div>BREAK — Mine block</div>
+              <div>BREAK — Mine / Attack</div>
               <div>PLACE — Place block</div>
               <div>Tap hotbar — Select</div>
+              <div>Tap weapon — Equip</div>
             </>
           ) : (
             <>
               <div>WASD — Move</div>
               <div>Space — Jump</div>
               <div>Mouse — Look around</div>
-              <div>Left Click — Break block</div>
+              <div>Left Click — Break / Attack</div>
               <div>Right Click — Place block</div>
-              <div>1–7 — Select block</div>
+              <div>1–9 — Select block</div>
+              <div>Q — Switch weapon</div>
               <div>Click game — Lock mouse</div>
               <div>Esc — Unlock mouse</div>
             </>

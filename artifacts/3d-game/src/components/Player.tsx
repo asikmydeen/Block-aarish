@@ -6,6 +6,7 @@ import { WorldState } from '../game/useWorld';
 import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS, INTERACTIVE_BLOCKS } from '../game/blockColors';
 import { touchState, consumeLookDelta, consumeBreak, consumePlace } from './TouchControls';
+import { combatRegistry, getWeapon, type WeaponType } from '../game/combat';
 
 enum Controls {
   forward = 'forward',
@@ -32,6 +33,7 @@ interface PlayerProps {
   touchMode: boolean;
   playerPosRef: MutableRefObject<THREE.Vector3>;
   respawnSignal: number;
+  weapon: WeaponType;
 }
 
 function raycastBlocks(
@@ -94,7 +96,7 @@ function raycastBlocks(
   return { hit: false };
 }
 
-export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPositionChange, touchMode, playerPosRef, respawnSignal }: PlayerProps) {
+export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPositionChange, touchMode, playerPosRef, respawnSignal, weapon }: PlayerProps) {
   const { camera, gl } = useThree();
   const velocityRef = useRef(new THREE.Vector3());
   const positionRef = useRef(new THREE.Vector3(8, 18, 8));
@@ -104,6 +106,54 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
   const pitchRef = useRef(0);
   const isLockedRef = useRef(false);
   const highlightRef = useRef<THREE.Mesh>(null);
+  const weaponGroupRef = useRef<THREE.Group>(null);
+  const weaponInnerRef = useRef<THREE.Group>(null);
+  const swingTimerRef = useRef(0);
+  const tracerRef = useRef<THREE.Mesh>(null);
+  const tracerTimerRef = useRef(0);
+  const weaponRef = useRef(weapon);
+
+  useEffect(() => {
+    weaponRef.current = weapon;
+  }, [weapon]);
+
+  const showTracer = (from: THREE.Vector3, to: THREE.Vector3) => {
+    const tracer = tracerRef.current;
+    if (!tracer) return;
+    const mid = from.clone().add(to).multiplyScalar(0.5);
+    const len = Math.max(0.1, from.distanceTo(to));
+    tracer.position.copy(mid);
+    tracer.lookAt(to);
+    tracer.scale.set(1, 1, len);
+    tracer.visible = true;
+    tracerTimerRef.current = 0.09;
+  };
+
+  const performAttack = (dir: THREE.Vector3): boolean => {
+    const w = weaponRef.current;
+    const spec = getWeapon(w);
+    swingTimerRef.current = 0.25;
+    const muzzle = camera.position
+      .clone()
+      .add(new THREE.Vector3(0.3, -0.25, 0).applyQuaternion(camera.quaternion))
+      .addScaledVector(dir, 0.4);
+    const hitPoint = combatRegistry.hitZombies?.(camera.position.clone(), dir, spec.range, spec.damage) ?? null;
+    if (hitPoint) {
+      if (w === 'blaster') showTracer(muzzle, hitPoint);
+      return true;
+    }
+    if (w === 'blaster') {
+      const result = raycastBlocks(camera.position, dir, world.getBlock, spec.range);
+      if (result.hit && result.blockPos && result.pos) {
+        showTracer(muzzle, result.pos);
+        onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
+      } else {
+        showTracer(muzzle, camera.position.clone().addScaledVector(dir, spec.range));
+      }
+      return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     if (respawnSignal === 0) return;
@@ -149,6 +199,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       if (e.button === 0) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
+        if (performAttack(dir)) return;
         const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
         if (result.hit && result.blockPos) {
           const { x, y, z } = result.blockPos;
@@ -247,9 +298,11 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       if (consumeBreak()) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
-        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
-        if (result.hit && result.blockPos) {
-          onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
+        if (!performAttack(dir)) {
+          const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+          if (result.hit && result.blockPos) {
+            onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
+          }
         }
       }
       if (consumePlace()) {
@@ -347,12 +400,85 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
         highlightRef.current.visible = false;
       }
     }
+
+    // Weapon viewmodel follows the camera
+    if (weaponGroupRef.current) {
+      weaponGroupRef.current.position.copy(camera.position);
+      weaponGroupRef.current.quaternion.copy(camera.quaternion);
+    }
+    swingTimerRef.current = Math.max(0, swingTimerRef.current - dt);
+    if (weaponInnerRef.current) {
+      const st = swingTimerRef.current;
+      const swing = st > 0 ? Math.sin(((0.25 - st) / 0.25) * Math.PI) : 0;
+      weaponInnerRef.current.rotation.x = -swing * 0.9;
+      const bobT = performance.now() * 0.006;
+      const moving = Math.abs(velocityRef.current.x) + Math.abs(velocityRef.current.z) > 0.5;
+      weaponInnerRef.current.position.y = -0.3 + (moving ? Math.sin(bobT) * 0.015 : 0);
+    }
+
+    // Tracer fade
+    if (tracerRef.current) {
+      tracerTimerRef.current = Math.max(0, tracerTimerRef.current - dt);
+      tracerRef.current.visible = tracerTimerRef.current > 0;
+    }
   });
 
   return (
-    <mesh ref={highlightRef} visible={false}>
-      <boxGeometry args={[1.01, 1.01, 1.01]} />
-      <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.5} />
-    </mesh>
+    <>
+      <mesh ref={highlightRef} visible={false}>
+        <boxGeometry args={[1.01, 1.01, 1.01]} />
+        <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.5} />
+      </mesh>
+
+      {/* Blaster tracer beam */}
+      <mesh ref={tracerRef} visible={false}>
+        <boxGeometry args={[0.035, 0.035, 1]} />
+        <meshBasicMaterial color="#39ffcb" transparent opacity={0.9} />
+      </mesh>
+
+      {/* First-person weapon viewmodel */}
+      <group ref={weaponGroupRef}>
+        <group ref={weaponInnerRef} position={[0.35, -0.3, -0.6]}>
+          {/* Sword */}
+          <group visible={weapon === 'sword'} rotation={[0.35, 0, -0.35]}>
+            <mesh position={[0, 0.28, 0]}>
+              <boxGeometry args={[0.07, 0.72, 0.02]} />
+              <meshBasicMaterial color="#d7e0ea" />
+            </mesh>
+            <mesh position={[0, 0.28, 0.011]}>
+              <boxGeometry args={[0.02, 0.72, 0.005]} />
+              <meshBasicMaterial color="#9fb2c4" />
+            </mesh>
+            <mesh position={[0, -0.11, 0]}>
+              <boxGeometry args={[0.22, 0.05, 0.06]} />
+              <meshBasicMaterial color="#8a6a30" />
+            </mesh>
+            <mesh position={[0, -0.25, 0]}>
+              <boxGeometry args={[0.06, 0.24, 0.06]} />
+              <meshBasicMaterial color="#5a3d1a" />
+            </mesh>
+          </group>
+          {/* Blaster */}
+          <group visible={weapon === 'blaster'} rotation={[0, -0.08, 0]}>
+            <mesh position={[0, 0, -0.16]}>
+              <boxGeometry args={[0.09, 0.1, 0.48]} />
+              <meshBasicMaterial color="#3a3f4a" />
+            </mesh>
+            <mesh position={[0, 0.07, -0.05]}>
+              <boxGeometry args={[0.06, 0.04, 0.16]} />
+              <meshBasicMaterial color="#22262e" />
+            </mesh>
+            <mesh position={[0, -0.13, 0.05]} rotation={[0.35, 0, 0]}>
+              <boxGeometry args={[0.07, 0.22, 0.1]} />
+              <meshBasicMaterial color="#2a2e36" />
+            </mesh>
+            <mesh position={[0, 0, -0.42]}>
+              <boxGeometry args={[0.055, 0.055, 0.08]} />
+              <meshBasicMaterial color="#39ffcb" />
+            </mesh>
+          </group>
+        </group>
+      </group>
+    </>
   );
 }
