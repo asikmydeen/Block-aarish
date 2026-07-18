@@ -7,6 +7,7 @@ import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS, INTERACTIVE_BLOCKS } from '../game/blockColors';
 import { touchState, consumeLookDelta, consumeBreak, consumePlace } from './TouchControls';
 import { combatRegistry, getWeapon, type WeaponType } from '../game/combat';
+import { drivingState } from '../game/cars';
 
 enum Controls {
   forward = 'forward',
@@ -174,7 +175,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       isLockedRef.current = !!document.pointerLockElement;
     };
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isLockedRef.current) return;
+      if (!isLockedRef.current || drivingState.active) return;
       const sensitivity = 0.002;
       yawRef.current -= e.movementX * sensitivity;
       pitchRef.current -= e.movementY * sensitivity;
@@ -195,7 +196,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
   useEffect(() => {
     if (touchMode) return;
     const handleMouseDown = (e: MouseEvent) => {
-      if (!isLockedRef.current) return;
+      if (!isLockedRef.current || drivingState.active) return;
       if (e.button === 0) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
@@ -246,6 +247,29 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
   useFrame((_, delta) => {
     const controls = getControls();
     const dt = Math.min(delta, 0.05);
+
+    // While driving, the Cars component owns movement and the camera
+    if (drivingState.active) {
+      positionRef.current.copy(playerPosRef.current);
+      velocityRef.current.set(0, 0, 0);
+      if (weaponGroupRef.current) weaponGroupRef.current.visible = false;
+      if (highlightRef.current) highlightRef.current.visible = false;
+      onPositionChange(positionRef.current);
+      world.loadChunksAround(positionRef.current.x, positionRef.current.z);
+      return;
+    }
+    if (drivingState.justExited) {
+      drivingState.justExited = false;
+      positionRef.current.copy(playerPosRef.current);
+      velocityRef.current.set(0, 0, 0);
+      // Resume looking the same way the chase camera was facing to avoid a snap
+      const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+      yawRef.current = euler.y;
+      pitchRef.current = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, euler.x));
+    }
+    if (weaponGroupRef.current && !weaponGroupRef.current.visible) {
+      weaponGroupRef.current.visible = true;
+    }
 
     if (touchMode) {
       const { dx, dy } = consumeLookDelta();

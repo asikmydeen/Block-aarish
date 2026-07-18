@@ -14,6 +14,9 @@ import { PLACEABLE_BLOCKS } from '../game/blockColors';
 import { generateHouseUpdates } from '../game/houses';
 import { ChestUI, Toast, LootItem, generateLoot } from '../components/InteractionUI';
 import { WEAPONS, type WeaponType } from '../game/combat';
+import { Cars } from '../components/Cars';
+import { generateRoadUpdates } from '../game/roads';
+import { CAR_SPECS, type CarInfo, carsRegistry, drivingState } from '../game/cars';
 
 enum Controls {
   forward = 'forward',
@@ -43,6 +46,8 @@ function GameScene({
   onDamagePlayer,
   alive,
   weapon,
+  onDrivingChange,
+  onCrash,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
@@ -55,6 +60,8 @@ function GameScene({
   onDamagePlayer: (amount: number) => void;
   alive: boolean;
   weapon: WeaponType;
+  onDrivingChange: (info: CarInfo | null) => void;
+  onCrash: (damage: number, broken: boolean) => void;
 }) {
   return (
     <>
@@ -80,6 +87,13 @@ function GameScene({
 
       <World world={world} />
       <Villagers world={world} />
+      <Cars
+        world={world}
+        playerPosRef={playerPosRef}
+        touchMode={touchMode}
+        onDrivingChange={onDrivingChange}
+        onCrash={onCrash}
+      />
       <Zombies
         world={world}
         playerPosRef={playerPosRef}
@@ -117,6 +131,7 @@ export default function Game() {
   const [chestOpen, setChestOpen] = useState(false);
   const [chestLoot, setChestLoot] = useState<LootItem[]>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [carInfo, setCarInfo] = useState<CarInfo | null>(null);
   const playerPosRef = useRef(new THREE.Vector3(8, 18, 8));
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -124,7 +139,7 @@ export default function Game() {
   const aliveRef = useRef(true);
 
   useEffect(() => {
-    world.setBlocks(generateHouseUpdates());
+    world.setBlocks([...generateHouseUpdates(), ...generateRoadUpdates()]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -148,11 +163,23 @@ export default function Game() {
     if (next <= 0) {
       aliveRef.current = false;
       setShowDeath(true);
+      // Force out of any car so respawn isn't overridden by driving sync
+      if (drivingState.active) {
+        carsRegistry.toggleDrive?.(playerPosRef.current);
+      }
+    }
+  }, []);
+
+  const handleRespawnGuard = useCallback(() => {
+    if (drivingState.active) {
+      carsRegistry.toggleDrive?.(playerPosRef.current);
     }
   }, []);
 
   const handleRespawn = useCallback(() => {
+    handleRespawnGuard();
     playerPosRef.current.set(8, 18, 8);
+    drivingState.justExited = true;
     healthRef.current = 10;
     aliveRef.current = true;
     setHealth(10);
@@ -215,15 +242,59 @@ export default function Game() {
         setSelectedBlock(PLACEABLE_BLOCKS[num - 1]);
       }
       if (e.key === 'q' || e.key === 'Q') {
+        if (drivingState.active) return;
         setWeapon(w => {
           const idx = WEAPONS.findIndex(spec => spec.id === w);
           return WEAPONS[(idx + 1) % WEAPONS.length].id;
         });
       }
+      if (e.key === 'e' || e.key === 'E') {
+        carsRegistry.toggleDrive?.(playerPosRef.current);
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        if (drivingState.active) return;
+        const res = carsRegistry.repairNear?.(playerPosRef.current);
+        if (res) {
+          const name = CAR_SPECS[res.kind].name;
+          if (res.wasBroken && res.health > 0) {
+            showToastRef.current?.(`${name} engine restarted! (${res.health}/${res.maxHealth})`);
+          } else if (res.health >= res.maxHealth) {
+            showToastRef.current?.(`${name} fully repaired!`);
+          } else {
+            showToastRef.current?.(`Repairing ${name}... (${res.health}/${res.maxHealth})`);
+          }
+        }
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, []);
+
+  const showToastRef = useRef<((msg: string) => void) | null>(null);
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
+
+  const handleCrash = useCallback((damage: number, broken: boolean) => {
+    if (broken) {
+      showToast('Car wrecked! Get out (E) and press R to repair it.');
+    } else {
+      showToast(`Crash! Car took ${damage} damage.`);
+    }
+  }, [showToast]);
+
+  const handleCarButton = useCallback(() => {
+    carsRegistry.toggleDrive?.(playerPosRef.current);
+  }, []);
+
+  const handleRepairButton = useCallback(() => {
+    if (drivingState.active) return;
+    const res = carsRegistry.repairNear?.(playerPosRef.current);
+    if (res) {
+      const name = CAR_SPECS[res.kind].name;
+      showToast(res.health >= res.maxHealth ? `${name} fully repaired!` : `Repairing ${name}... (${res.health}/${res.maxHealth})`);
+    }
+  }, [showToast]);
 
   const handleBlockInteract = useCallback((
     type: 'break' | 'place',
@@ -299,6 +370,8 @@ export default function Game() {
               onDamagePlayer={handleDamagePlayer}
               alive={!showDeath}
               weapon={weapon}
+              onDrivingChange={setCarInfo}
+              onCrash={handleCrash}
             />
           </Suspense>
         </Canvas>
@@ -316,6 +389,9 @@ export default function Game() {
         maxHealth={10}
         weapon={weapon}
         onSelectWeapon={setWeapon}
+        carInfo={carInfo}
+        onCarButton={handleCarButton}
+        onRepairButton={handleRepairButton}
       />
 
       {isFlashing && (

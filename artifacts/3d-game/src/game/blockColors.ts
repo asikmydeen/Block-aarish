@@ -20,6 +20,7 @@ export const BLOCK_COLORS: Record<BlockType, string> = {
   chest: '#8B6914',
   door: '#5C3317',
   bed: '#C84040',
+  road: '#3A3A3E',
 };
 
 export const BLOCK_TOP_COLORS: Record<BlockType, string> = {
@@ -42,6 +43,7 @@ export const BLOCK_TOP_COLORS: Record<BlockType, string> = {
   chest: '#D4AF37',
   door: '#7A4520',
   bed: '#F5F0E8',
+  road: '#46464A',
 };
 
 export const BLOCK_EMISSIVE: Partial<Record<BlockType, string>> = {
@@ -75,6 +77,7 @@ export const BLOCK_NAMES: Record<BlockType, string> = {
   chest: 'Chest',
   door: 'Door',
   bed: 'Bed',
+  road: 'Road',
 };
 
 export const TRANSPARENT_BLOCKS: Set<BlockType> = new Set(['water', 'glass']);

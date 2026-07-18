@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BlockType } from '../game/terrain';
 import { BLOCK_COLORS, BLOCK_NAMES, PLACEABLE_BLOCKS } from '../game/blockColors';
 import { WEAPONS, type WeaponType } from '../game/combat';
+import { CAR_SPECS, type CarInfo } from '../game/cars';
 import * as THREE from 'three';
 
 const WEAPON_ICONS: Record<WeaponType, string> = {
@@ -22,6 +23,9 @@ interface GameUIProps {
   maxHealth: number;
   weapon: WeaponType;
   onSelectWeapon: (w: WeaponType) => void;
+  carInfo: CarInfo | null;
+  onCarButton: () => void;
+  onRepairButton: () => void;
 }
 
 function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
@@ -44,7 +48,7 @@ function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
   );
 }
 
-export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon }: GameUIProps) {
+export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon, carInfo, onCarButton, onRepairButton }: GameUIProps) {
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -210,6 +214,93 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
         </div>
       </div>
 
+      {/* Car HUD (while driving) */}
+      {carInfo && (
+        <div style={{
+          position: 'fixed',
+          top: 16,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.6)',
+          color: 'white',
+          padding: '8px 14px',
+          borderRadius: 8,
+          zIndex: 100,
+          fontFamily: 'monospace',
+          fontSize: 13,
+          border: '1px solid rgba(255,255,255,0.2)',
+          textAlign: 'center',
+          minWidth: 180,
+        }}>
+          <div style={{ marginBottom: 4, color: '#ffd24d' }}>
+            🚗 {CAR_SPECS[carInfo.kind].name}{carInfo.broken ? ' — BROKEN' : ''}
+          </div>
+          <div style={{
+            width: '100%',
+            height: 8,
+            background: '#3a0a0a',
+            borderRadius: 4,
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: `${(carInfo.health / carInfo.maxHealth) * 100}%`,
+              height: '100%',
+              background: carInfo.broken ? '#777' : carInfo.health / carInfo.maxHealth > 0.4 ? '#3ddc5a' : '#ff9f2a',
+              transition: 'width 0.2s',
+            }} />
+          </div>
+          <div style={{ marginTop: 4, fontSize: 11, color: '#bbb' }}>
+            {carInfo.broken ? 'Exit (E) and press R to repair' : touchMode ? 'Joystick to drive · CAR to exit' : 'WASD to drive · E to exit'}
+          </div>
+        </div>
+      )}
+
+      {/* Touch car buttons */}
+      {touchMode && isLocked && (
+        <div style={{
+          position: 'fixed',
+          right: 16,
+          bottom: 300,
+          zIndex: 120,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}>
+          <button
+            onClick={onCarButton}
+            style={{
+              background: carInfo ? 'rgba(200,60,60,0.75)' : 'rgba(50,110,190,0.75)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 10,
+              padding: '10px 14px',
+              fontFamily: 'monospace',
+              fontSize: 13,
+              cursor: 'pointer',
+            }}
+          >
+            {carInfo ? 'EXIT 🚗' : 'CAR 🚗'}
+          </button>
+          {!carInfo && (
+            <button
+              onClick={onRepairButton}
+              style={{
+                background: 'rgba(190,150,40,0.75)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 10,
+                padding: '10px 14px',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              FIX 🔧
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Selected block label */}
       <div style={{
         position: 'fixed',
@@ -316,6 +407,8 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>PLACE — Place block</div>
               <div>Tap hotbar — Select</div>
               <div>Tap weapon — Equip</div>
+              <div>CAR — Enter/exit car</div>
+              <div>FIX — Repair car</div>
             </>
           ) : (
             <>
@@ -326,6 +419,8 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>Right Click — Place block</div>
               <div>1–9 — Select block</div>
               <div>Q — Switch weapon</div>
+              <div>E — Enter/exit car</div>
+              <div>R — Repair car</div>
               <div>Click game — Lock mouse</div>
               <div>Esc — Unlock mouse</div>
             </>
