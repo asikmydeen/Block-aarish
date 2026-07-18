@@ -400,11 +400,24 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
     const blocked =
       isSolid(world, px, car.pos.y + 0.3, pz) ||
       isSolid(world, px, car.pos.y + 1.2, pz);
-    if (blocked) {
+
+    // Car-vs-car collision: don't drive through other cars
+    let hitOther: CarData | null = null;
+    for (const other of cars) {
+      if (other.id === car.id) continue;
+      const d = Math.hypot(px - other.pos.x, pz - other.pos.z);
+      if (d < 2.7 && Math.abs(car.pos.y - other.pos.y) < 2) {
+        hitOther = other;
+        break;
+      }
+    }
+
+    if (blocked || hitOther) {
       const impact = Math.abs(car.speed);
       if (impact > 4) {
         const damage = Math.max(1, Math.round((impact - 3) / 2));
         const becameBroken = applyDamage(car, damage);
+        if (hitOther) applyDamage(hitOther, damage);
         if (isPlayer) onCrash(damage, car.health <= 0);
         if (becameBroken) car.speed = 0;
       }

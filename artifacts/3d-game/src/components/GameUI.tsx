@@ -283,13 +283,17 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
           position: 'fixed',
           right: 16,
           bottom: 300,
-          zIndex: 120,
+          zIndex: 200,
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
         }}>
           <button
-            onClick={onCarButton}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCarButton();
+            }}
             style={{
               background: carInfo ? 'rgba(200,60,60,0.75)' : 'rgba(50,110,190,0.75)',
               color: 'white',
@@ -299,13 +303,18 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               fontFamily: 'monospace',
               fontSize: 13,
               cursor: 'pointer',
+              touchAction: 'none',
             }}
           >
             {carInfo ? 'EXIT 🚗' : 'CAR 🚗'}
           </button>
           {!carInfo && (
             <button
-              onClick={onRepairButton}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onRepairButton();
+              }}
               style={{
                 background: 'rgba(190,150,40,0.75)',
                 color: 'white',
@@ -315,6 +324,7 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
                 fontFamily: 'monospace',
                 fontSize: 13,
                 cursor: 'pointer',
+                touchAction: 'none',
               }}
             >
               FIX 🔧
