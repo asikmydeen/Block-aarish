@@ -28,11 +28,13 @@ export interface CarInfo {
 export const drivingState = { active: false, justExited: false };
 
 export interface CarsRegistry {
-  toggleDrive: ((playerPos: THREE.Vector3) => 'entered' | 'exited' | null) | null;
+  toggleDrive: ((playerPos: THREE.Vector3) => 'entered' | 'exited' | 'occupied' | null) | null;
   repairNear: ((playerPos: THREE.Vector3) => { kind: CarKind; health: number; maxHealth: number; wasBroken: boolean } | null) | null;
+  hitCar: ((origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number, damage: number) => THREE.Vector3 | null) | null;
 }
 
 export const carsRegistry: CarsRegistry = {
   toggleDrive: null,
   repairNear: null,
+  hitCar: null,
 };

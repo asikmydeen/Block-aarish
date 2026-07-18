@@ -7,7 +7,7 @@ import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS, INTERACTIVE_BLOCKS } from '../game/blockColors';
 import { touchState, consumeLookDelta, consumeBreak, consumePlace } from './TouchControls';
 import { combatRegistry, getWeapon, type WeaponType } from '../game/combat';
-import { drivingState } from '../game/cars';
+import { drivingState, carsRegistry } from '../game/cars';
 
 enum Controls {
   forward = 'forward',
@@ -141,6 +141,11 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     const hitPoint = combatRegistry.hitZombies?.(camera.position.clone(), dir, spec.range, spec.damage) ?? null;
     if (hitPoint) {
       if (w === 'blaster') showTracer(muzzle, hitPoint);
+      return true;
+    }
+    const carHit = carsRegistry.hitCar?.(camera.position.clone(), dir, spec.range, spec.damage) ?? null;
+    if (carHit) {
+      if (w === 'blaster') showTracer(muzzle, carHit);
       return true;
     }
     if (w === 'blaster') {

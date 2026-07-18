@@ -16,7 +16,7 @@ import { ChestUI, Toast, LootItem, generateLoot } from '../components/Interactio
 import { WEAPONS, type WeaponType } from '../game/combat';
 import { Cars } from '../components/Cars';
 import { generateRoadUpdates } from '../game/roads';
-import { CAR_SPECS, type CarInfo, carsRegistry, drivingState } from '../game/cars';
+import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
 
 enum Controls {
   forward = 'forward',
@@ -48,6 +48,7 @@ function GameScene({
   weapon,
   onDrivingChange,
   onCrash,
+  onNearCar,
 }: {
   world: ReturnType<typeof useWorld>;
   selectedBlock: BlockType;
@@ -62,6 +63,7 @@ function GameScene({
   weapon: WeaponType;
   onDrivingChange: (info: CarInfo | null) => void;
   onCrash: (damage: number, broken: boolean) => void;
+  onNearCar: (kind: CarKind | null) => void;
 }) {
   return (
     <>
@@ -93,6 +95,7 @@ function GameScene({
         touchMode={touchMode}
         onDrivingChange={onDrivingChange}
         onCrash={onCrash}
+        onNearCar={onNearCar}
       />
       <Zombies
         world={world}
@@ -132,6 +135,7 @@ export default function Game() {
   const [chestLoot, setChestLoot] = useState<LootItem[]>([]);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [carInfo, setCarInfo] = useState<CarInfo | null>(null);
+  const [nearCar, setNearCar] = useState<CarKind | null>(null);
   const playerPosRef = useRef(new THREE.Vector3(8, 18, 8));
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -249,7 +253,11 @@ export default function Game() {
         });
       }
       if (e.key === 'e' || e.key === 'E') {
-        carsRegistry.toggleDrive?.(playerPosRef.current);
+        if (e.repeat) return;
+        const res = carsRegistry.toggleDrive?.(playerPosRef.current);
+        if (res === 'occupied') {
+          showToastRef.current?.('That car already has a driver!');
+        }
       }
       if (e.key === 'r' || e.key === 'R') {
         if (drivingState.active) return;
@@ -284,8 +292,11 @@ export default function Game() {
   }, [showToast]);
 
   const handleCarButton = useCallback(() => {
-    carsRegistry.toggleDrive?.(playerPosRef.current);
-  }, []);
+    const res = carsRegistry.toggleDrive?.(playerPosRef.current);
+    if (res === 'occupied') {
+      showToast('That car already has a driver!');
+    }
+  }, [showToast]);
 
   const handleRepairButton = useCallback(() => {
     if (drivingState.active) return;
@@ -372,6 +383,7 @@ export default function Game() {
               weapon={weapon}
               onDrivingChange={setCarInfo}
               onCrash={handleCrash}
+              onNearCar={setNearCar}
             />
           </Suspense>
         </Canvas>
@@ -390,6 +402,7 @@ export default function Game() {
         weapon={weapon}
         onSelectWeapon={setWeapon}
         carInfo={carInfo}
+        nearCar={nearCar}
         onCarButton={handleCarButton}
         onRepairButton={handleRepairButton}
       />

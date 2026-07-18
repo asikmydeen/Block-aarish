@@ -14,6 +14,11 @@ enum Controls {
   jump = 'jump',
 }
 
+interface VillagerDriver {
+  shirt: string;
+  skin: string;
+}
+
 interface CarData {
   id: number;
   kind: CarKind;
@@ -23,19 +28,32 @@ interface CarData {
   speed: number;
   health: number;
   crashFlash: number;
+  villagerDriver: VillagerDriver | null;
+  axis: 'x' | 'z';
+  patrolMin: number;
+  patrolMax: number;
+  aiPause: number;
 }
 
-const ENTER_RANGE = 3.5;
-const REPAIR_RANGE = 4;
+const ENTER_RANGE = 5;
+const REPAIR_RANGE = 5;
 const REPAIR_AMOUNT = 4;
 
-const CAR_SPAWNS: Array<{ x: number; z: number; heading: number; kind: CarKind; color: string }> = [
-  { x: 12, z: -2, heading: Math.PI, kind: 'sedan', color: '#c0392b' },
-  { x: -20, z: -2, heading: 0, kind: 'sports', color: '#2980d9' },
-  { x: 35, z: -2, heading: Math.PI, kind: 'truck', color: '#d68a2e' },
-  { x: -2, z: 15, heading: Math.PI / 2, kind: 'sedan', color: '#27ae60' },
-  { x: -2, z: -30, heading: -Math.PI / 2, kind: 'sports', color: '#f1c40f' },
-  { x: -2, z: 45, heading: Math.PI / 2, kind: 'truck', color: '#7f8c8d' },
+const CAR_SPAWNS: Array<{
+  x: number;
+  z: number;
+  heading: number;
+  kind: CarKind;
+  color: string;
+  axis: 'x' | 'z';
+  villager?: VillagerDriver;
+}> = [
+  { x: 12, z: -2, heading: Math.PI, kind: 'sedan', color: '#c0392b', axis: 'x' },
+  { x: -20, z: -2, heading: 0, kind: 'sports', color: '#2980d9', axis: 'x', villager: { shirt: '#8e44ad', skin: '#f5cba7' } },
+  { x: 35, z: -2, heading: Math.PI, kind: 'truck', color: '#d68a2e', axis: 'x' },
+  { x: -2, z: 15, heading: Math.PI / 2, kind: 'sedan', color: '#27ae60', axis: 'z', villager: { shirt: '#d35400', skin: '#a47148' } },
+  { x: -2, z: -30, heading: -Math.PI / 2, kind: 'sports', color: '#f1c40f', axis: 'z' },
+  { x: -2, z: 45, heading: Math.PI / 2, kind: 'truck', color: '#7f8c8d', axis: 'z' },
 ];
 
 function isSolid(world: WorldState, x: number, y: number, z: number): boolean {
@@ -53,6 +71,17 @@ function findGroundY(world: WorldState, x: number, z: number): number {
   return 13;
 }
 
+// Ray-march through blocks to find the first solid hit distance (for occlusion)
+function firstBlockT(world: WorldState, origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number): number {
+  const step = 0.4;
+  const p = new THREE.Vector3();
+  for (let t = step; t <= maxDist; t += step) {
+    p.copy(origin).addScaledVector(dir, t);
+    if (isSolid(world, p.x, p.y, p.z)) return t;
+  }
+  return Infinity;
+}
+
 function createCars(): CarData[] {
   return CAR_SPAWNS.map((s, i) => ({
     id: i,
@@ -63,6 +92,11 @@ function createCars(): CarData[] {
     speed: 0,
     health: CAR_SPECS[s.kind].maxHealth,
     crashFlash: 0,
+    villagerDriver: s.villager ?? null,
+    axis: s.axis,
+    patrolMin: -62,
+    patrolMax: 62,
+    aiPause: 0,
   }));
 }
 
@@ -72,9 +106,10 @@ interface CarsProps {
   touchMode: boolean;
   onDrivingChange: (info: CarInfo | null) => void;
   onCrash: (damage: number, broken: boolean) => void;
+  onNearCar: (kind: CarKind | null) => void;
 }
 
-export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash }: CarsProps) {
+export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash, onNearCar }: CarsProps) {
   const { camera } = useThree();
   const [, getControls] = useKeyboardControls<Controls>();
   const carsRef = useRef<CarData[] | null>(null);
@@ -85,14 +120,23 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
   const groupRefs = useRef<(THREE.Group | null)[]>(cars.map(() => null));
   const smokeRefs = useRef<(THREE.Group | null)[]>(cars.map(() => null));
   const wheelRefs = useRef<THREE.Mesh[][]>(cars.map(() => []));
+  const nearTimerRef = useRef(0);
+  const lastNearRef = useRef<CarKind | null>(null);
+
+  // Keep latest world/callbacks in refs so the registry effect registers once
+  // and stays live across re-renders (world identity changes every render).
+  const worldRef = useRef(world);
+  worldRef.current = world;
+  const onDrivingChangeRef = useRef(onDrivingChange);
+  onDrivingChangeRef.current = onDrivingChange;
 
   const emitInfo = (car: CarData | null) => {
     if (!car) {
-      onDrivingChange(null);
+      onDrivingChangeRef.current(null);
       return;
     }
     const spec = CAR_SPECS[car.kind];
-    onDrivingChange({
+    onDrivingChangeRef.current({
       kind: car.kind,
       health: car.health,
       maxHealth: spec.maxHealth,
@@ -101,12 +145,19 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
     });
   };
 
+  const applyDamage = (car: CarData, damage: number) => {
+    const wasBroken = car.health <= 0;
+    car.health = Math.max(0, car.health - damage);
+    car.crashFlash = 0.3;
+    if (drivingIdRef.current === car.id) emitInfo(car);
+    return !wasBroken && car.health <= 0;
+  };
+
   useEffect(() => {
     carsRegistry.toggleDrive = (playerPos: THREE.Vector3) => {
       if (drivingIdRef.current !== null) {
         const car = cars[drivingIdRef.current];
         car.speed = 0;
-        // Find a clear exit spot beside the car
         const side = new THREE.Vector3(-Math.sin(car.heading), 0, Math.cos(car.heading));
         const candidates = [
           car.pos.clone().addScaledVector(side, 2),
@@ -116,12 +167,12 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
         ];
         let exit = candidates[0];
         for (const c of candidates) {
-          if (!isSolid(world, c.x, c.y, c.z) && !isSolid(world, c.x, c.y + 1, c.z)) {
+          if (!isSolid(worldRef.current, c.x, c.y, c.z) && !isSolid(worldRef.current, c.x, c.y + 1, c.z)) {
             exit = c;
             break;
           }
         }
-        exit.y = findGroundY(world, exit.x, exit.z);
+        exit.y = findGroundY(worldRef.current, exit.x, exit.z);
         playerPosRef.current.copy(exit);
         drivingIdRef.current = null;
         drivingState.active = false;
@@ -130,15 +181,18 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
         return 'exited';
       }
       let bestId: number | null = null;
+      let bestOccupied = false;
       let bestDist = ENTER_RANGE;
       for (const car of cars) {
         const d = Math.hypot(playerPos.x - car.pos.x, playerPos.z - car.pos.z);
-        if (d < bestDist && Math.abs(playerPos.y - car.pos.y) < 3) {
+        if (d < bestDist && Math.abs(playerPos.y - car.pos.y) < 4) {
           bestDist = d;
           bestId = car.id;
+          bestOccupied = car.villagerDriver !== null;
         }
       }
       if (bestId === null) return null;
+      if (bestOccupied) return 'occupied';
       drivingIdRef.current = bestId;
       drivingState.active = true;
       emitInfo(cars[bestId]);
@@ -165,22 +219,79 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
       return { kind: best.kind, health: best.health, maxHealth: spec.maxHealth, wasBroken };
     };
 
+    carsRegistry.hitCar = (origin: THREE.Vector3, dir: THREE.Vector3, maxDist: number, damage: number) => {
+      // Nearest ray-sphere intersection against car bodies
+      let bestT = Infinity;
+      let bestCar: CarData | null = null;
+      const center = new THREE.Vector3();
+      const toCar = new THREE.Vector3();
+      for (const car of cars) {
+        if (drivingIdRef.current === car.id) continue; // don't shoot the car you're in
+        center.set(car.pos.x, car.pos.y + 0.9, car.pos.z);
+        toCar.copy(center).sub(origin);
+        const tProj = toCar.dot(dir);
+        if (tProj < 0 || tProj > maxDist) continue;
+        const distSq = toCar.lengthSq() - tProj * tProj;
+        const radius = 1.9;
+        if (distSq > radius * radius) continue;
+        const t = tProj - Math.sqrt(radius * radius - distSq);
+        if (t < bestT) {
+          bestT = t;
+          bestCar = car;
+        }
+      }
+      if (!bestCar || bestT === Infinity) return null;
+      // Blocked by a wall?
+      if (firstBlockT(worldRef.current, origin, dir, bestT) < bestT - 0.5) return null;
+      const becameBroken = applyDamage(bestCar, damage);
+      if (becameBroken && bestCar.villagerDriver) {
+        bestCar.speed = 0;
+      }
+      return origin.clone().addScaledVector(dir, Math.max(0.1, bestT));
+    };
+
     return () => {
       carsRegistry.toggleDrive = null;
       carsRegistry.repairNear = null;
+      carsRegistry.hitCar = null;
     };
+    // Register once; cleanup only on unmount. Latest world/callbacks come via refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cars, world, playerPosRef]);
+  }, []);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     const drivingId = drivingIdRef.current;
+
+    // "Press E to drive" proximity prompt (throttled)
+    nearTimerRef.current -= dt;
+    if (nearTimerRef.current <= 0) {
+      nearTimerRef.current = 0.25;
+      let near: CarKind | null = null;
+      if (drivingId === null) {
+        const p = playerPosRef.current;
+        let bestDist = ENTER_RANGE;
+        for (const car of cars) {
+          if (car.villagerDriver) continue;
+          const d = Math.hypot(p.x - car.pos.x, p.z - car.pos.z);
+          if (d < bestDist && Math.abs(p.y - car.pos.y) < 4) {
+            bestDist = d;
+            near = car.kind;
+          }
+        }
+      }
+      if (near !== lastNearRef.current) {
+        lastNearRef.current = near;
+        onNearCar(near);
+      }
+    }
 
     for (let i = 0; i < cars.length; i++) {
       const car = cars[i];
       const spec = CAR_SPECS[car.kind];
       const isDriven = drivingId === car.id;
       car.crashFlash = Math.max(0, car.crashFlash - dt);
+      const broken = car.health <= 0;
 
       if (isDriven) {
         const controls = getControls();
@@ -195,7 +306,6 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
           if (controls.left) steer = 1;
           else if (controls.right) steer = -1;
         }
-        const broken = car.health <= 0;
         if (broken) throttle = 0;
 
         if (throttle !== 0) {
@@ -211,69 +321,54 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
           car.heading += steer * spec.turnRate * factor * dt * Math.sign(car.speed);
         }
 
-        if (car.speed !== 0) {
-          const dirX = Math.cos(car.heading);
-          const dirZ = Math.sin(car.heading);
-          const nx = car.pos.x + dirX * car.speed * dt;
-          const nz = car.pos.z + dirZ * car.speed * dt;
-          // Probe ahead of the bumper in the direction of travel
-          const probeDist = 1.5 * Math.sign(car.speed);
-          const px = nx + dirX * probeDist;
-          const pz = nz + dirZ * probeDist;
-          const blocked =
-            isSolid(world, px, car.pos.y + 0.3, pz) ||
-            isSolid(world, px, car.pos.y + 1.2, pz);
-          if (blocked) {
-            const impact = Math.abs(car.speed);
-            if (impact > 4) {
-              const damage = Math.max(1, Math.round((impact - 3) / 2));
-              car.health = Math.max(0, car.health - damage);
-              car.crashFlash = 0.3;
-              onCrash(damage, car.health <= 0);
-              emitInfo(car);
-            }
-            car.speed = -car.speed * 0.25;
-          } else {
-            // Don't drive off cliffs steeper than 1 block or into water
-            const groundY = findGroundY(world, nx, nz);
-            if (Math.abs(groundY - car.pos.y) <= 1.2) {
-              car.pos.x = nx;
-              car.pos.z = nz;
-              car.pos.y += (groundY - car.pos.y) * Math.min(1, dt * 10);
-            } else {
-              car.speed *= 0.5;
-            }
-          }
-        }
+        moveCar(car, dt, true);
 
         playerPosRef.current.set(car.pos.x, car.pos.y, car.pos.z);
 
-        // Chase camera
         const camDist = 7;
         const cx = car.pos.x - Math.cos(car.heading) * camDist;
         const cz = car.pos.z - Math.sin(car.heading) * camDist;
         const cy = car.pos.y + 4;
         camera.position.lerp(new THREE.Vector3(cx, cy, cz), Math.min(1, dt * 6));
         camera.lookAt(car.pos.x, car.pos.y + 1.2, car.pos.z);
+      } else if (car.villagerDriver && !broken) {
+        // Villager AI: cruise back and forth along the car's road
+        car.aiPause = Math.max(0, car.aiPause - dt);
+        if (car.aiPause <= 0) {
+          const targetSpeed = spec.maxSpeed * 0.45;
+          car.speed = Math.min(targetSpeed, car.speed + spec.accel * 0.6 * dt);
+
+          // Turn around at patrol ends
+          const coord = car.axis === 'x' ? car.pos.x : car.pos.z;
+          const movingPositive = car.axis === 'x' ? Math.cos(car.heading) > 0 : Math.sin(car.heading) > 0;
+          if ((coord > car.patrolMax && movingPositive) || (coord < car.patrolMin && !movingPositive)) {
+            car.heading += Math.PI;
+            car.speed = 0;
+            car.aiPause = 0.8;
+          } else {
+            moveCar(car, dt, false);
+          }
+        } else {
+          car.speed = 0;
+        }
+      } else if (car.villagerDriver && broken) {
+        car.speed = 0;
       }
 
       const g = groupRefs.current[i];
       if (g) {
         g.position.copy(car.pos);
         g.rotation.y = -car.heading + Math.PI / 2;
-        // Crash shake
         if (car.crashFlash > 0) {
           g.position.y += Math.sin(car.crashFlash * 60) * 0.05;
         }
       }
 
-      // Wheel spin
       const wheels = wheelRefs.current[i];
       for (const w of wheels) {
         if (w) w.rotation.x += car.speed * dt * 2.5;
       }
 
-      // Smoke when broken or badly damaged
       const smoke = smokeRefs.current[i];
       if (smoke) {
         const damagedRatio = car.health / spec.maxHealth;
@@ -293,6 +388,50 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
     }
   });
 
+  function moveCar(car: CarData, dt: number, isPlayer: boolean) {
+    if (car.speed === 0) return;
+    const dirX = Math.cos(car.heading);
+    const dirZ = Math.sin(car.heading);
+    const nx = car.pos.x + dirX * car.speed * dt;
+    const nz = car.pos.z + dirZ * car.speed * dt;
+    const probeDist = 1.5 * Math.sign(car.speed);
+    const px = nx + dirX * probeDist;
+    const pz = nz + dirZ * probeDist;
+    const blocked =
+      isSolid(world, px, car.pos.y + 0.3, pz) ||
+      isSolid(world, px, car.pos.y + 1.2, pz);
+    if (blocked) {
+      const impact = Math.abs(car.speed);
+      if (impact > 4) {
+        const damage = Math.max(1, Math.round((impact - 3) / 2));
+        const becameBroken = applyDamage(car, damage);
+        if (isPlayer) onCrash(damage, car.health <= 0);
+        if (becameBroken) car.speed = 0;
+      }
+      if (isPlayer) {
+        car.speed = -car.speed * 0.25;
+      } else {
+        // AI turns around after bumping into something
+        car.speed = 0;
+        car.heading += Math.PI;
+        car.aiPause = 1.2;
+      }
+    } else {
+      const groundY = findGroundY(world, nx, nz);
+      if (Math.abs(groundY - car.pos.y) <= 1.2) {
+        car.pos.x = nx;
+        car.pos.z = nz;
+        car.pos.y += (groundY - car.pos.y) * Math.min(1, dt * 10);
+      } else {
+        car.speed *= 0.5;
+        if (!isPlayer) {
+          car.heading += Math.PI;
+          car.aiPause = 1.0;
+        }
+      }
+    }
+  }
+
   return (
     <>
       {cars.map((car, i) => {
@@ -301,6 +440,8 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
         const bodyLen = isTruck ? 3.4 : isSports ? 2.8 : 3.0;
         const bodyH = isTruck ? 1.0 : isSports ? 0.55 : 0.7;
         const bodyW = isTruck ? 1.5 : 1.3;
+        const seatY = isTruck ? 1.75 : 0.55 + bodyH + 0.15;
+        const seatZ = isTruck ? bodyLen / 2 - 0.7 : isSports ? -0.3 : 0;
         return (
           <group
             key={car.id}
@@ -317,13 +458,34 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash 
             {isTruck ? (
               <mesh position={[0, 1.55 + 0.35, bodyLen / 2 - 0.7]} castShadow>
                 <boxGeometry args={[bodyW - 0.1, 0.7, 1.2]} />
-                <meshLambertMaterial color="#aeb6bf" />
+                <meshLambertMaterial color="#aeb6bf" transparent opacity={0.75} />
               </mesh>
             ) : (
               <mesh position={[0, 0.55 + bodyH + 0.3, isSports ? -0.3 : 0]} castShadow>
                 <boxGeometry args={[bodyW - 0.2, 0.6, bodyLen * 0.5]} />
-                <meshLambertMaterial color="#aed6f1" />
+                <meshLambertMaterial color="#aed6f1" transparent opacity={0.65} />
               </mesh>
+            )}
+            {/* Villager driver */}
+            {car.villagerDriver && (
+              <group position={[0, seatY - 0.35, seatZ]}>
+                <mesh castShadow>
+                  <boxGeometry args={[0.45, 0.55, 0.28]} />
+                  <meshLambertMaterial color={car.villagerDriver.shirt} />
+                </mesh>
+                <mesh position={[0, 0.5, 0]} castShadow>
+                  <boxGeometry args={[0.38, 0.38, 0.38]} />
+                  <meshLambertMaterial color={car.villagerDriver.skin} />
+                </mesh>
+                <mesh position={[-0.09, 0.54, 0.2]}>
+                  <boxGeometry args={[0.05, 0.05, 0.02]} />
+                  <meshBasicMaterial color="#111" />
+                </mesh>
+                <mesh position={[0.09, 0.54, 0.2]}>
+                  <boxGeometry args={[0.05, 0.05, 0.02]} />
+                  <meshBasicMaterial color="#111" />
+                </mesh>
+              </group>
             )}
             {/* Truck cargo bed */}
             {isTruck && (

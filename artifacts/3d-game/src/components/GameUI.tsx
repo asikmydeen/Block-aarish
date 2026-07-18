@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BlockType } from '../game/terrain';
 import { BLOCK_COLORS, BLOCK_NAMES, PLACEABLE_BLOCKS } from '../game/blockColors';
 import { WEAPONS, type WeaponType } from '../game/combat';
-import { CAR_SPECS, type CarInfo } from '../game/cars';
+import { CAR_SPECS, type CarInfo, type CarKind } from '../game/cars';
 import * as THREE from 'three';
 
 const WEAPON_ICONS: Record<WeaponType, string> = {
@@ -24,6 +24,7 @@ interface GameUIProps {
   weapon: WeaponType;
   onSelectWeapon: (w: WeaponType) => void;
   carInfo: CarInfo | null;
+  nearCar: CarKind | null;
   onCarButton: () => void;
   onRepairButton: () => void;
 }
@@ -48,7 +49,7 @@ function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
   );
 }
 
-export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon, carInfo, onCarButton, onRepairButton }: GameUIProps) {
+export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon, carInfo, nearCar, onCarButton, onRepairButton }: GameUIProps) {
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -252,6 +253,27 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
           <div style={{ marginTop: 4, fontSize: 11, color: '#bbb' }}>
             {carInfo.broken ? 'Exit (E) and press R to repair' : touchMode ? 'Joystick to drive · CAR to exit' : 'WASD to drive · E to exit'}
           </div>
+        </div>
+      )}
+
+      {/* Press E to drive prompt */}
+      {!carInfo && nearCar && isLocked && (
+        <div style={{
+          position: 'fixed',
+          bottom: '30%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.65)',
+          color: '#ffd24d',
+          padding: '8px 16px',
+          borderRadius: 8,
+          fontFamily: 'monospace',
+          fontSize: 14,
+          border: '1px solid rgba(255,210,77,0.4)',
+          pointerEvents: 'none',
+          zIndex: 30,
+        }}>
+          {touchMode ? `Tap CAR to drive the ${CAR_SPECS[nearCar].name}` : `Press E to drive the ${CAR_SPECS[nearCar].name}`}
         </div>
       )}
 
