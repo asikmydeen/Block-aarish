@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, Suspense, type MutableRefObject } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense, type MutableRefObject } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls, Sky, Stars } from '@react-three/drei';
 import * as THREE from 'three';
@@ -17,6 +17,8 @@ import { WEAPONS, type WeaponType } from '../game/combat';
 import { Cars } from '../components/Cars';
 import { generateRoadUpdates } from '../game/roads';
 import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
+import { POWERS, type PowerId, applyPowers, powerState } from '../game/powers';
+import { SecretNumbers } from '../components/SecretNumbers';
 
 enum Controls {
   forward = 'forward',
@@ -136,6 +138,19 @@ export default function Game() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [carInfo, setCarInfo] = useState<CarInfo | null>(null);
   const [nearCar, setNearCar] = useState<CarKind | null>(null);
+  const [unlockedPowers, setUnlockedPowers] = useState<Set<PowerId>>(new Set());
+  const [codeOpen, setCodeOpen] = useState(false);
+  const [codeValue, setCodeValue] = useState('');
+  const codeOpenRef = useRef(false);
+  const chestOpenRef = useRef(false);
+  const openCodeBoxRef = useRef<(() => void) | null>(null);
+  const foundCodes = useMemo(() => {
+    const s = new Set<string>();
+    POWERS.forEach(p => {
+      if (unlockedPowers.has(p.id)) s.add(p.code);
+    });
+    return s;
+  }, [unlockedPowers]);
   const playerPosRef = useRef(new THREE.Vector3(8, 18, 8));
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,7 +172,8 @@ export default function Game() {
 
   const handleDamagePlayer = useCallback((amount: number) => {
     if (!aliveRef.current || healthRef.current <= 0) return;
-    const next = Math.max(0, healthRef.current - amount);
+    const reduced = Math.max(1, Math.ceil(amount * powerState.damageTakenMult));
+    const next = Math.max(0, healthRef.current - reduced);
     if (next === healthRef.current) return;
     healthRef.current = next;
     setHealth(next);
@@ -227,9 +243,9 @@ export default function Game() {
     if (health >= 10 || health <= 0) return;
     const t = setInterval(() => {
       setHealth(h => (h < 10 && h > 0 ? h + 1 : h));
-    }, 4000);
+    }, powerState.fastRegen ? 1200 : 4000);
     return () => clearInterval(t);
-  }, [health]);
+  }, [health, unlockedPowers]);
 
   useEffect(() => {
     const handleLockChange = () => {
@@ -241,6 +257,12 @@ export default function Game() {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (codeOpenRef.current) return;
+      if (e.key === 'c' || e.key === 'C') {
+        if (e.repeat) return;
+        openCodeBoxRef.current?.();
+        return;
+      }
       const num = parseInt(e.key);
       if (num >= 1 && num <= PLACEABLE_BLOCKS.length) {
         setSelectedBlock(PLACEABLE_BLOCKS[num - 1]);
@@ -290,6 +312,56 @@ export default function Game() {
       showToast(`Crash! Car took ${damage} damage.`);
     }
   }, [showToast]);
+
+  const openCodeBox = useCallback(() => {
+    if (drivingState.active) {
+      showToastRef.current?.('Stop the car first! (E to get out)');
+      return;
+    }
+    if (chestOpenRef.current || !aliveRef.current) return;
+    codeOpenRef.current = true;
+    setCodeOpen(true);
+    setCodeValue('');
+    if (document.pointerLockElement) document.exitPointerLock();
+  }, []);
+
+  useEffect(() => {
+    chestOpenRef.current = chestOpen;
+  }, [chestOpen]);
+
+  useEffect(() => {
+    openCodeBoxRef.current = openCodeBox;
+  }, [openCodeBox]);
+
+  const closeCodeBox = useCallback(() => {
+    codeOpenRef.current = false;
+    setCodeOpen(false);
+    setCodeValue('');
+  }, []);
+
+  const handleCodeSubmit = useCallback(() => {
+    const entered = codeValue.trim();
+    if (!entered) return;
+    const match = POWERS.find(p => p.code === entered);
+    if (!match) {
+      showToast('Nothing happened... that number holds no power.');
+    } else {
+      setUnlockedPowers(prev => {
+        if (prev.has(match.id)) {
+          showToast(`${match.icon} ${match.name} is already active!`);
+          return prev;
+        }
+        const next = new Set(prev);
+        next.add(match.id);
+        applyPowers(next);
+        showToast(`${match.icon} ${match.name} unlocked! ${match.desc}`);
+        return next;
+      });
+    }
+    codeOpenRef.current = false;
+    setCodeOpen(false);
+    setCodeValue('');
+  }, [codeValue, showToast]);
 
   const handleCarButton = useCallback(() => {
     const res = carsRegistry.toggleDrive?.(playerPosRef.current);
@@ -385,6 +457,7 @@ export default function Game() {
               onCrash={handleCrash}
               onNearCar={setNearCar}
             />
+            <SecretNumbers world={world} found={foundCodes} />
           </Suspense>
         </Canvas>
       </KeyboardControls>
@@ -405,6 +478,8 @@ export default function Game() {
         nearCar={nearCar}
         onCarButton={handleCarButton}
         onRepairButton={handleRepairButton}
+        unlockedPowers={unlockedPowers}
+        onCodeButton={openCodeBox}
       />
 
       {isFlashing && (
@@ -458,6 +533,102 @@ export default function Game() {
       )}
 
       <TouchControls enabled={touchMode && started && !showDeath} />
+
+      {codeOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 250,
+            fontFamily: 'monospace',
+          }}
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) closeCodeBox();
+          }}
+        >
+          <div
+            style={{
+              background: '#1a1a2e',
+              border: '2px solid #8a4fd0',
+              borderRadius: 12,
+              padding: '24px 28px',
+              color: 'white',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              minWidth: 280,
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 'bold', color: '#c9a0ff' }}>🔢 Secret Code</div>
+            <div style={{ fontSize: 12, color: '#aaa' }}>
+              Found a glowing number in the world? Type it here to unlock a special power!
+            </div>
+            <input
+              autoFocus
+              value={codeValue}
+              onChange={(e) => setCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') handleCodeSubmit();
+                if (e.key === 'Escape') closeCodeBox();
+              }}
+              inputMode="numeric"
+              placeholder="Enter number..."
+              style={{
+                background: '#0d0d1a',
+                border: '1px solid #555',
+                borderRadius: 8,
+                padding: '10px 12px',
+                color: 'white',
+                fontSize: 20,
+                fontFamily: 'monospace',
+                letterSpacing: 4,
+                textAlign: 'center',
+                outline: 'none',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleCodeSubmit}
+                style={{
+                  flex: 1,
+                  background: '#8a4fd0',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px 0',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                }}
+              >
+                Unlock
+              </button>
+              <button
+                onClick={closeCodeBox}
+                style={{
+                  flex: 1,
+                  background: 'rgba(255,255,255,0.12)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px 0',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {chestOpen && (
         <ChestUI

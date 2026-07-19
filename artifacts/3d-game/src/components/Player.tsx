@@ -8,6 +8,7 @@ import { PLACEABLE_BLOCKS, INTERACTIVE_BLOCKS } from '../game/blockColors';
 import { touchState, consumeLookDelta, consumeBreak, consumePlace } from './TouchControls';
 import { combatRegistry, getWeapon, type WeaponType } from '../game/combat';
 import { drivingState, carsRegistry } from '../game/cars';
+import { powerState } from '../game/powers';
 
 enum Controls {
   forward = 'forward',
@@ -138,12 +139,13 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       .clone()
       .add(new THREE.Vector3(0.3, -0.25, 0).applyQuaternion(camera.quaternion))
       .addScaledVector(dir, 0.4);
-    const hitPoint = combatRegistry.hitZombies?.(camera.position.clone(), dir, spec.range, spec.damage) ?? null;
+    const attackDamage = Math.round(spec.damage * powerState.damageMult);
+    const hitPoint = combatRegistry.hitZombies?.(camera.position.clone(), dir, spec.range, attackDamage) ?? null;
     if (hitPoint) {
       if (w === 'blaster') showTracer(muzzle, hitPoint);
       return true;
     }
-    const carHit = carsRegistry.hitCar?.(camera.position.clone(), dir, spec.range, spec.damage) ?? null;
+    const carHit = carsRegistry.hitCar?.(camera.position.clone(), dir, spec.range, attackDamage) ?? null;
     if (carHit) {
       if (w === 'blaster') showTracer(muzzle, carHit);
       return true;
@@ -308,7 +310,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     }
 
     const sprint = !touchMode && controls.forward && !controls.back;
-    const speed = sprint ? SPRINT_SPEED : MOVE_SPEED;
+    const speed = (sprint ? SPRINT_SPEED : MOVE_SPEED) * powerState.speedMult;
 
     if (moveDir.lengthSq() > 0) {
       moveDir.normalize().multiplyScalar(speed);
@@ -319,7 +321,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
 
     const wantJump = touchMode ? touchState.jump : controls.jump;
     if (wantJump && isGroundedRef.current) {
-      velocityRef.current.y = JUMP_VELOCITY;
+      velocityRef.current.y = JUMP_VELOCITY * powerState.jumpMult;
       isGroundedRef.current = false;
     }
 
@@ -360,7 +362,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       }
     }
 
-    velocityRef.current.y += GRAVITY * dt;
+    velocityRef.current.y += GRAVITY * powerState.gravityMult * dt;
 
     const pos = positionRef.current.clone();
 

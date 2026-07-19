@@ -3,6 +3,7 @@ import { BlockType } from '../game/terrain';
 import { BLOCK_COLORS, BLOCK_NAMES, PLACEABLE_BLOCKS } from '../game/blockColors';
 import { WEAPONS, type WeaponType } from '../game/combat';
 import { CAR_SPECS, type CarInfo, type CarKind } from '../game/cars';
+import { POWERS, type PowerId } from '../game/powers';
 import * as THREE from 'three';
 
 const WEAPON_ICONS: Record<WeaponType, string> = {
@@ -27,6 +28,8 @@ interface GameUIProps {
   nearCar: CarKind | null;
   onCarButton: () => void;
   onRepairButton: () => void;
+  unlockedPowers: ReadonlySet<PowerId>;
+  onCodeButton: () => void;
 }
 
 function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
@@ -49,7 +52,7 @@ function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
   );
 }
 
-export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon, carInfo, nearCar, onCarButton, onRepairButton }: GameUIProps) {
+export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon, carInfo, nearCar, onCarButton, onRepairButton, unlockedPowers, onCodeButton }: GameUIProps) {
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -330,6 +333,28 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               FIX 🔧
             </button>
           )}
+          {!carInfo && (
+            <button
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onCodeButton();
+              }}
+              style={{
+                background: 'rgba(130,60,190,0.75)',
+                color: 'white',
+                border: '1px solid rgba(255,255,255,0.3)',
+                borderRadius: 10,
+                padding: '10px 14px',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                cursor: 'pointer',
+                touchAction: 'none',
+              }}
+            >
+              CODE 🔢
+            </button>
+          )}
         </div>
       )}
 
@@ -370,6 +395,31 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
         <div>Y: {position.y.toFixed(1)}</div>
         <div>Z: {position.z.toFixed(1)}</div>
       </div>
+
+      {/* Active powers HUD */}
+      {unlockedPowers.size > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 96,
+          left: 16,
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          background: 'rgba(0,0,0,0.45)',
+          padding: '6px 10px',
+          borderRadius: 6,
+          fontFamily: 'monospace',
+          fontSize: 12,
+        }}>
+          <div style={{ color: '#aef', fontWeight: 'bold' }}>Powers</div>
+          {POWERS.filter(p => unlockedPowers.has(p.id)).map(p => (
+            <div key={p.id} style={{ color: p.color, textShadow: '1px 1px 2px black' }}>
+              {p.icon} {p.name}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Top-right buttons */}
       <div style={{
@@ -441,6 +491,8 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>Tap weapon — Equip</div>
               <div>CAR — Enter/exit car</div>
               <div>FIX — Repair car</div>
+              <div>CODE — Enter secret number</div>
+              <div style={{ color: '#e0aaff' }}>6 secret numbers hide in the world...</div>
             </>
           ) : (
             <>
@@ -453,6 +505,8 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>Q — Switch weapon</div>
               <div>E — Enter/exit car</div>
               <div>R — Repair car</div>
+              <div>C — Enter secret number</div>
+              <div style={{ color: '#e0aaff' }}>6 secret numbers hide in the world...</div>
               <div>Click game — Lock mouse</div>
               <div>Esc — Unlock mouse</div>
             </>
