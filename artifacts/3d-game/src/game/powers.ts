@@ -52,7 +52,7 @@ export const POWERS: PowerSpec[] = [
   { id: 'goldenheart', code: '472', name: 'Golden Heart', icon: '💛', desc: 'Repeat numbers heal +4 instead of +2', color: '#ffd60a' },
 ];
 
-// Hundreds of secret numbers scattered across the world (y resolved from terrain at runtime).
+// Secret numbers scattered across the world (y resolved from terrain at runtime).
 // Each code maps to one of the 20 powers. Deterministic seeded generation so the world
 // is the same every session.
 function mulberry32(seed: number) {
@@ -79,7 +79,7 @@ function generateSpots(): { spots: SecretSpot[]; codeToPower: Map<string, PowerS
   const spots: SecretSpot[] = [];
   const codeToPower = new Map<string, PowerSpec>();
   const usedCodes = new Set<string>();
-  const COUNT = 300;
+  const COUNT = 80;
   for (let i = 0; i < COUNT; i++) {
     let code = '';
     do {
