@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
-import { SECRET_SPOTS } from '../game/powers';
+import { SECRET_SPOTS, powerState } from '../game/powers';
 
 const VIEW_DIST = 38;
 const RESOLVE_DIST = 60;
@@ -45,7 +45,9 @@ export function SecretNumbers({ world, found, playerPosRef }: SecretNumbersProps
       const dz = s.z - pz;
       const distSq = dx * dx + dz * dz;
 
-      if (doResolve && distSq < RESOLVE_DIST * RESOLVE_DIST) {
+      if (s.fixedY !== undefined) {
+        baseYs.current[i] = s.fixedY;
+      } else if (doResolve && distSq < RESOLVE_DIST * RESOLVE_DIST) {
         const gy = findGroundY(world, s.x, s.z);
         if (gy !== null) baseYs.current[i] = gy;
       }
@@ -53,7 +55,9 @@ export function SecretNumbers({ world, found, playerPosRef }: SecretNumbersProps
       const g = groupRefs.current[i];
       if (!g) continue;
       const baseY = baseYs.current[i];
-      if (baseY === null || distSq > VIEW_DIST * VIEW_DIST || found.has(s.code)) {
+      // Indoor numbers stay sneaky: Eagle Eye doesn't reveal them from afar.
+      const viewDist = s.fixedY !== undefined ? 14 : VIEW_DIST * powerState.codeVisionMult;
+      if (baseY === null || distSq > viewDist * viewDist || found.has(s.code)) {
         g.visible = false;
         continue;
       }

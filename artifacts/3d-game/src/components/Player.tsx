@@ -145,23 +145,23 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     if (powerState.critChance > 0 && Math.random() < powerState.critChance) {
       attackDamage *= 2;
     }
-    const hitPoint = combatRegistry.hitZombies?.(camera.position.clone(), dir, spec.range, attackDamage) ?? null;
+    const hitPoint = combatRegistry.hitZombies?.(camera.position.clone(), dir, spec.range * powerState.rangeMult, attackDamage) ?? null;
     if (hitPoint) {
       if (w === 'blaster') showTracer(muzzle, hitPoint);
       return true;
     }
-    const carHit = carsRegistry.hitCar?.(camera.position.clone(), dir, spec.range, attackDamage) ?? null;
+    const carHit = carsRegistry.hitCar?.(camera.position.clone(), dir, spec.range * powerState.rangeMult, attackDamage) ?? null;
     if (carHit) {
       if (w === 'blaster') showTracer(muzzle, carHit);
       return true;
     }
     if (w === 'blaster') {
-      const result = raycastBlocks(camera.position, dir, world.getBlock, spec.range);
+      const result = raycastBlocks(camera.position, dir, world.getBlock, spec.range * powerState.rangeMult);
       if (result.hit && result.blockPos && result.pos) {
         showTracer(muzzle, result.pos);
         onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
       } else {
-        showTracer(muzzle, camera.position.clone().addScaledVector(dir, spec.range));
+        showTracer(muzzle, camera.position.clone().addScaledVector(dir, spec.range * powerState.rangeMult));
       }
       return true;
     }

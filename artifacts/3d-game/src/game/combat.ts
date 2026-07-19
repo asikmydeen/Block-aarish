@@ -28,6 +28,11 @@ export type ZombieHitFn = (
   damage: number
 ) => THREE.Vector3 | null;
 
-export const combatRegistry: { hitZombies: ZombieHitFn | null } = {
+export const combatRegistry: {
+  hitZombies: ZombieHitFn | null;
+  // Game registers this to react to zombie kills (vampire heal, note drops).
+  onZombieKilled: ((pos: THREE.Vector3) => void) | null;
+} = {
   hitZombies: null,
+  onZombieKilled: null,
 };

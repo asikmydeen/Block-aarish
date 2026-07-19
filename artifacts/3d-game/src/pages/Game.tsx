@@ -13,11 +13,11 @@ import { BlockType } from '../game/terrain';
 import { PLACEABLE_BLOCKS } from '../game/blockColors';
 import { generateHouseUpdates } from '../game/houses';
 import { ChestUI, Toast, LootItem, generateLoot } from '../components/InteractionUI';
-import { WEAPONS, type WeaponType } from '../game/combat';
+import { WEAPONS, type WeaponType, combatRegistry } from '../game/combat';
 import { Cars } from '../components/Cars';
 import { generateRoadUpdates } from '../game/roads';
 import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
-import { CODE_TO_POWER, type PowerId, applyPowers, powerState } from '../game/powers';
+import { CODE_TO_POWER, SECRET_SPOTS, type PowerId, applyPowers, powerState } from '../game/powers';
 import { SecretNumbers } from '../components/SecretNumbers';
 
 enum Controls {
@@ -299,6 +299,35 @@ export default function Game() {
     showToastRef.current = showToast;
   }, [showToast]);
 
+  const enteredCodesRef = useRef<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    enteredCodesRef.current = enteredCodes;
+  }, [enteredCodes]);
+
+  // Zombie kills: Vampire heal + a chance the zombie drops a secret-number note.
+  useEffect(() => {
+    combatRegistry.onZombieKilled = () => {
+      if (!aliveRef.current) return;
+      if (powerState.vampire && healthRef.current > 0 && healthRef.current < powerState.maxHealth) {
+        const healed = Math.min(powerState.maxHealth, healthRef.current + 1);
+        healthRef.current = healed;
+        setHealth(healed);
+      }
+      if (Math.random() < 0.2) {
+        const unused = SECRET_SPOTS.filter(s => !enteredCodesRef.current.has(s.code));
+        if (unused.length > 0) {
+          const pick = unused[Math.floor(Math.random() * unused.length)];
+          showToastRef.current?.(`📜 The zombie dropped a note: "${pick.code}"`);
+        }
+      }
+    };
+    return () => {
+      combatRegistry.onZombieKilled = null;
+    };
+    // Registered once; latest state comes via refs and powerState.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCrash = useCallback((damage: number, broken: boolean) => {
     if (broken) {
       showToast('Car wrecked! Get out (E) and press R to repair it.');
@@ -350,10 +379,10 @@ export default function Game() {
       setUnlockedPowers(prev => {
         if (prev.has(match.id)) {
           // Bonus for finding another number of an already-active power
-          const healed = Math.min(powerState.maxHealth, healthRef.current + 2);
+          const healed = Math.min(powerState.maxHealth, healthRef.current + powerState.bonusHeal);
           healthRef.current = healed;
           setHealth(healed);
-          showToast(`${match.icon} Another ${match.name} number! Bonus: +2 health.`);
+          showToast(`${match.icon} Another ${match.name} number! Bonus: +${powerState.bonusHeal} health.`);
           return prev;
         }
         const next = new Set(prev);

@@ -13,7 +13,12 @@ export type PowerId =
   | 'fear'
   | 'crit'
   | 'vitality'
-  | 'loot';
+  | 'loot'
+  | 'vampire'
+  | 'sniper'
+  | 'ninja'
+  | 'eagleeye'
+  | 'goldenheart';
 
 export interface PowerSpec {
   id: PowerId;
@@ -40,10 +45,15 @@ export const POWERS: PowerSpec[] = [
   { id: 'crit', code: '714', name: 'Lucky Strike', icon: '🍀', desc: '25% chance to deal double damage', color: '#7bed9f' },
   { id: 'vitality', code: '962', name: 'Vitality', icon: '❤️', desc: 'Max health raised to 16', color: '#ff8fa3' },
   { id: 'loot', code: '345', name: 'Lucky Looter', icon: '💰', desc: 'Chests hold much more loot', color: '#f9c74f' },
+  { id: 'vampire', code: '618', name: 'Vampire', icon: '🧛', desc: 'Defeating a zombie heals you +1 health', color: '#d00000' },
+  { id: 'sniper', code: '281', name: 'Sniper', icon: '🎯', desc: 'Weapons reach twice as far', color: '#f77f00' },
+  { id: 'ninja', code: '839', name: 'Ninja', icon: '🥷', desc: 'Zombies only notice you up close', color: '#6c757d' },
+  { id: 'eagleeye', code: '156', name: 'Eagle Eye', icon: '👁️', desc: 'Spot secret numbers from far away', color: '#48cae4' },
+  { id: 'goldenheart', code: '472', name: 'Golden Heart', icon: '💛', desc: 'Repeat numbers heal +4 instead of +2', color: '#ffd60a' },
 ];
 
 // Hundreds of secret numbers scattered across the world (y resolved from terrain at runtime).
-// Each code maps to one of the 15 powers. Deterministic seeded generation so the world
+// Each code maps to one of the 20 powers. Deterministic seeded generation so the world
 // is the same every session.
 function mulberry32(seed: number) {
   return function () {
@@ -60,6 +70,8 @@ export interface SecretSpot {
   z: number;
   color: string;
   powerId: PowerId;
+  // Fixed height for indoor spots (skips terrain ground detection).
+  fixedY?: number;
 }
 
 function generateSpots(): { spots: SecretSpot[]; codeToPower: Map<string, PowerSpec> } {
@@ -86,6 +98,38 @@ function generateSpots(): { spots: SecretSpot[]; codeToPower: Map<string, PowerS
     spots.push({ code, x, z, color: power.color, powerId: power.id });
     codeToPower.set(code, power);
   }
+
+  // Extra-sneaky numbers hidden inside buildings (fixed indoor height,
+  // tucked near a wall so you have to walk in and look around).
+  const INDOOR_SPOTS: Array<{ x: number; z: number }> = [
+    { x: 24, z: 7 },    // cottage
+    { x: -13, z: 20 },  // cabin
+    { x: 6, z: -19 },   // modern house
+    { x: -24, z: -11 }, // futuristic house
+    { x: 30, z: -23 },  // tower
+    { x: -26, z: 23 },  // cottage 2
+    { x: 57, z: 12 },   // skyscraper
+    { x: -57, z: -12 }, // skyscraper 2
+    { x: 42, z: -41 },  // apartment
+    { x: -42, z: 41 },  // apartment 2
+  ];
+  for (let i = 0; i < INDOOR_SPOTS.length; i++) {
+    let code = '';
+    do {
+      code = String(100 + Math.floor(rand() * 900));
+    } while (usedCodes.has(code));
+    usedCodes.add(code);
+    const power = POWERS[(COUNT + i) % POWERS.length];
+    spots.push({
+      code,
+      x: INDOOR_SPOTS[i].x,
+      z: INDOOR_SPOTS[i].z,
+      color: power.color,
+      powerId: power.id,
+      fixedY: 13,
+    });
+    codeToPower.set(code, power);
+  }
   return { spots, codeToPower };
 }
 
@@ -110,6 +154,11 @@ export const powerState = {
   critChance: 0,
   maxHealth: 10,
   lootLuck: false,
+  vampire: false,
+  rangeMult: 1,
+  zombieDetectMult: 1,
+  codeVisionMult: 1,
+  bonusHeal: 2,
 };
 
 export function applyPowers(unlocked: ReadonlySet<PowerId>) {
@@ -128,4 +177,9 @@ export function applyPowers(unlocked: ReadonlySet<PowerId>) {
   powerState.critChance = unlocked.has('crit') ? 0.25 : 0;
   powerState.maxHealth = unlocked.has('vitality') ? 16 : 10;
   powerState.lootLuck = unlocked.has('loot');
+  powerState.vampire = unlocked.has('vampire');
+  powerState.rangeMult = unlocked.has('sniper') ? 2 : 1;
+  powerState.zombieDetectMult = unlocked.has('ninja') ? 0.45 : 1;
+  powerState.codeVisionMult = unlocked.has('eagleeye') ? 2.4 : 1;
+  powerState.bonusHeal = unlocked.has('goldenheart') ? 4 : 2;
 }

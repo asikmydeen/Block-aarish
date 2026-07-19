@@ -127,6 +127,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
       if (z.health <= 0) {
         z.dead = true;
         z.respawnTimer = 8;
+        combatRegistry.onZombieKilled?.(new THREE.Vector3(z.pos.x, z.pos.y, z.pos.z));
       }
       return new THREE.Vector3(z.pos.x, z.pos.y + 1.0, z.pos.z);
     };
@@ -173,7 +174,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
       const dz = player.z - z.pos.z;
       const distToPlayer = Math.hypot(dx, dz);
 
-      const seesPlayer = alive && distToPlayer < DETECTION_RANGE;
+      const seesPlayer = alive && distToPlayer < DETECTION_RANGE * powerState.zombieDetectMult;
 
       if (seesPlayer) {
         z.dir = Math.atan2(dz, dx);
