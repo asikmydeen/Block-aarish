@@ -5,8 +5,8 @@ import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
 import { SECRET_SPOTS } from '../game/powers';
 
-const VIEW_DIST = 90;
-const RESOLVE_DIST = 110;
+const VIEW_DIST = 38;
+const RESOLVE_DIST = 60;
 
 function findGroundY(world: WorldState, x: number, z: number): number | null {
   const ix = Math.floor(x);
@@ -58,7 +58,7 @@ export function SecretNumbers({ world, found, playerPosRef }: SecretNumbersProps
         continue;
       }
       g.visible = true;
-      g.position.set(s.x, baseY + 1.6 + Math.sin(t * 1.5 + i * 1.3) * 0.25, s.z);
+      g.position.set(s.x, baseY + 1.0 + Math.sin(t * 1.5 + i * 1.3) * 0.2, s.z);
     }
   });
 
@@ -74,9 +74,9 @@ export function SecretNumbers({ world, found, playerPosRef }: SecretNumbersProps
         >
           <Billboard>
             <Text
-              fontSize={1.1}
+              fontSize={0.75}
               color={s.color}
-              outlineWidth={0.06}
+              outlineWidth={0.05}
               outlineColor="#000000"
               anchorX="center"
               anchorY="middle"

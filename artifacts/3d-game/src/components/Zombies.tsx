@@ -2,6 +2,7 @@ import { useRef, useEffect, type MutableRefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
+import { powerState } from '../game/powers';
 import { combatRegistry } from '../game/combat';
 
 interface ZombieData {
@@ -187,7 +188,7 @@ export function Zombies({ world, playerPosRef, onDamagePlayer, alive }: ZombiesP
       }
 
       if (z.walking) {
-        const speed = seesPlayer ? z.speed * 1.4 : z.speed * 0.8;
+        const speed = (seesPlayer ? z.speed * 1.4 : z.speed * 0.8) * powerState.zombieSpeedMult;
         const nx = z.pos.x + Math.cos(z.dir) * speed * dt;
         const nz = z.pos.z + Math.sin(z.dir) * speed * dt;
         const blocked =

@@ -21,13 +21,13 @@ const LOOT_POOL: Array<{ name: string; color: string; minQty: number; maxQty: nu
   { name: 'Steel Sword',   color: '#C0C8D0', minQty: 1,  maxQty: 1  },
 ];
 
-export function generateLoot(): LootItem[] {
+export function generateLoot(lucky = false): LootItem[] {
   const pool = [...LOOT_POOL].sort(() => Math.random() - 0.5);
-  const count = 4 + Math.floor(Math.random() * 3);
+  const count = (lucky ? 7 : 4) + Math.floor(Math.random() * 3);
   return pool.slice(0, count).map(entry => ({
     name: entry.name,
     color: entry.color,
-    qty: entry.minQty + Math.floor(Math.random() * (entry.maxQty - entry.minQty + 1)),
+    qty: (entry.minQty + Math.floor(Math.random() * (entry.maxQty - entry.minQty + 1))) * (lucky ? 2 : 1),
   }));
 }
 

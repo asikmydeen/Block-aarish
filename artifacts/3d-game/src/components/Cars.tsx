@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
 import { CAR_SPECS, type CarKind, type CarInfo, drivingState, carsRegistry } from '../game/cars';
 import { touchState } from './TouchControls';
+import { powerState } from '../game/powers';
 
 enum Controls {
   forward = 'forward',
@@ -147,6 +148,9 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
 
   const applyDamage = (car: CarData, damage: number) => {
     const wasBroken = car.health <= 0;
+    if (drivingIdRef.current === car.id && powerState.carDamageTakenMult < 1) {
+      damage = Math.max(1, Math.ceil(damage * powerState.carDamageTakenMult));
+    }
     car.health = Math.max(0, car.health - damage);
     car.crashFlash = 0.3;
     if (drivingIdRef.current === car.id) emitInfo(car);
@@ -214,7 +218,9 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
       if (!best) return null;
       const spec = CAR_SPECS[best.kind];
       const wasBroken = best.health <= 0;
-      best.health = Math.min(spec.maxHealth, best.health + REPAIR_AMOUNT);
+      best.health = powerState.fullRepair
+        ? spec.maxHealth
+        : Math.min(spec.maxHealth, best.health + REPAIR_AMOUNT);
       if (drivingIdRef.current === best.id) emitInfo(best);
       return { kind: best.kind, health: best.health, maxHealth: spec.maxHealth, wasBroken };
     };
@@ -314,7 +320,8 @@ export function Cars({ world, playerPosRef, touchMode, onDrivingChange, onCrash,
           car.speed *= Math.max(0, 1 - 2.0 * dt);
           if (Math.abs(car.speed) < 0.05) car.speed = 0;
         }
-        car.speed = Math.max(-spec.maxSpeed * 0.4, Math.min(spec.maxSpeed, car.speed));
+        const topSpeed = spec.maxSpeed * powerState.carSpeedMult;
+        car.speed = Math.max(-topSpeed * 0.4, Math.min(topSpeed, car.speed));
 
         if (steer !== 0 && Math.abs(car.speed) > 0.4) {
           const factor = Math.min(1, Math.abs(car.speed) / 5);

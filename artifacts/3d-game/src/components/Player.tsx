@@ -101,6 +101,8 @@ function raycastBlocks(
 export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPositionChange, touchMode, playerPosRef, respawnSignal, weapon }: PlayerProps) {
   const { camera, gl } = useThree();
   const velocityRef = useRef(new THREE.Vector3());
+  const prevJumpRef = useRef(false);
+  const airJumpUsedRef = useRef(false);
   const positionRef = useRef(new THREE.Vector3(8, 18, 8));
   const isGroundedRef = useRef(false);
   const [, getControls] = useKeyboardControls<Controls>();
@@ -139,7 +141,10 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       .clone()
       .add(new THREE.Vector3(0.3, -0.25, 0).applyQuaternion(camera.quaternion))
       .addScaledVector(dir, 0.4);
-    const attackDamage = Math.round(spec.damage * powerState.damageMult);
+    let attackDamage = Math.round(spec.damage * powerState.damageMult);
+    if (powerState.critChance > 0 && Math.random() < powerState.critChance) {
+      attackDamage *= 2;
+    }
     const hitPoint = combatRegistry.hitZombies?.(camera.position.clone(), dir, spec.range, attackDamage) ?? null;
     if (hitPoint) {
       if (w === 'blaster') showTracer(muzzle, hitPoint);
@@ -208,7 +213,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         if (performAttack(dir)) return;
-        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH * powerState.reachMult);
         if (result.hit && result.blockPos) {
           const { x, y, z } = result.blockPos;
           onBlockInteract('break', x, y, z);
@@ -217,7 +222,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       if (e.button === 2) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
-        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH * powerState.reachMult);
         if (result.hit && result.blockPos && result.normal) {
           const { x: bx, y: by, z: bz } = result.blockPos;
           const bt = world.getBlock(bx, by, bz);
@@ -320,9 +325,20 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
     velocityRef.current.z = moveDir.z;
 
     const wantJump = touchMode ? touchState.jump : controls.jump;
+    const jumpPressed = wantJump && !prevJumpRef.current;
+    prevJumpRef.current = wantJump;
+    if (isGroundedRef.current) airJumpUsedRef.current = false;
     if (wantJump && isGroundedRef.current) {
       velocityRef.current.y = JUMP_VELOCITY * powerState.jumpMult;
       isGroundedRef.current = false;
+    } else if (
+      jumpPressed &&
+      !isGroundedRef.current &&
+      powerState.doubleJump &&
+      !airJumpUsedRef.current
+    ) {
+      velocityRef.current.y = JUMP_VELOCITY * powerState.jumpMult * 0.9;
+      airJumpUsedRef.current = true;
     }
 
     if (touchMode) {
@@ -330,7 +346,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
         if (!performAttack(dir)) {
-          const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+          const result = raycastBlocks(camera.position, dir, world.getBlock, REACH * powerState.reachMult);
           if (result.hit && result.blockPos) {
             onBlockInteract('break', result.blockPos.x, result.blockPos.y, result.blockPos.z);
           }
@@ -339,7 +355,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
       if (consumePlace()) {
         const dir = new THREE.Vector3();
         camera.getWorldDirection(dir);
-        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+        const result = raycastBlocks(camera.position, dir, world.getBlock, REACH * powerState.reachMult);
         if (result.hit && result.blockPos && result.normal) {
           const { x: bx, y: by, z: bz } = result.blockPos;
           const bt = world.getBlock(bx, by, bz);
@@ -418,7 +434,7 @@ export function Player({ world, onBlockInteract, onInteract, selectedBlock, onPo
 
     const dir = new THREE.Vector3();
     camera.getWorldDirection(dir);
-    const result = raycastBlocks(camera.position, dir, world.getBlock, REACH);
+    const result = raycastBlocks(camera.position, dir, world.getBlock, REACH * powerState.reachMult);
     if (highlightRef.current) {
       if (result.hit && result.blockPos) {
         highlightRef.current.visible = true;

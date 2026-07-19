@@ -1,4 +1,19 @@
-export type PowerId = 'speed' | 'jump' | 'strength' | 'shield' | 'regen' | 'feather';
+export type PowerId =
+  | 'speed'
+  | 'jump'
+  | 'strength'
+  | 'shield'
+  | 'regen'
+  | 'feather'
+  | 'reach'
+  | 'turbo'
+  | 'chassis'
+  | 'mechanic'
+  | 'doublejump'
+  | 'fear'
+  | 'crit'
+  | 'vitality'
+  | 'loot';
 
 export interface PowerSpec {
   id: PowerId;
@@ -16,10 +31,19 @@ export const POWERS: PowerSpec[] = [
   { id: 'shield', code: '342', name: 'Stone Skin', icon: '🛡️', desc: 'Take only half damage', color: '#b0bec5' },
   { id: 'regen', code: '775', name: 'Regeneration', icon: '💚', desc: 'Health recovers much faster', color: '#66ff8c' },
   { id: 'feather', code: '168', name: 'Feather Fall', icon: '🪶', desc: 'Low gravity — float like a feather', color: '#e0aaff' },
+  { id: 'reach', code: '429', name: 'Long Arms', icon: '🦾', desc: 'Break and place blocks from twice as far', color: '#ffa94d' },
+  { id: 'turbo', code: '651', name: 'Turbo Driver', icon: '🏎️', desc: 'Cars you drive go 50% faster', color: '#4dd2ff' },
+  { id: 'chassis', code: '384', name: 'Steel Chassis', icon: '🚙', desc: 'Your car takes half crash damage', color: '#9fb4c7' },
+  { id: 'mechanic', code: '527', name: 'Master Mechanic', icon: '🔧', desc: 'One press of R fully repairs a car', color: '#ffd166' },
+  { id: 'doublejump', code: '893', name: 'Double Jump', icon: '🐰', desc: 'Jump again in mid-air', color: '#8affc1' },
+  { id: 'fear', code: '236', name: 'Fear Aura', icon: '👻', desc: 'Zombies move much slower near you', color: '#c8b6ff' },
+  { id: 'crit', code: '714', name: 'Lucky Strike', icon: '🍀', desc: '25% chance to deal double damage', color: '#7bed9f' },
+  { id: 'vitality', code: '962', name: 'Vitality', icon: '❤️', desc: 'Max health raised to 16', color: '#ff8fa3' },
+  { id: 'loot', code: '345', name: 'Lucky Looter', icon: '💰', desc: 'Chests hold much more loot', color: '#f9c74f' },
 ];
 
 // Hundreds of secret numbers scattered across the world (y resolved from terrain at runtime).
-// Each code maps to one of the 6 powers. Deterministic seeded generation so the world
+// Each code maps to one of the 15 powers. Deterministic seeded generation so the world
 // is the same every session.
 function mulberry32(seed: number) {
   return function () {
@@ -69,7 +93,7 @@ const generated = generateSpots();
 export const SECRET_SPOTS: SecretSpot[] = generated.spots;
 export const CODE_TO_POWER: Map<string, PowerSpec> = generated.codeToPower;
 
-// Mutable multipliers read by Player/combat each frame.
+// Mutable multipliers read by Player/combat/cars/zombies each frame.
 export const powerState = {
   speedMult: 1,
   jumpMult: 1,
@@ -77,6 +101,15 @@ export const powerState = {
   damageMult: 1,
   damageTakenMult: 1,
   fastRegen: false,
+  reachMult: 1,
+  carSpeedMult: 1,
+  carDamageTakenMult: 1,
+  fullRepair: false,
+  doubleJump: false,
+  zombieSpeedMult: 1,
+  critChance: 0,
+  maxHealth: 10,
+  lootLuck: false,
 };
 
 export function applyPowers(unlocked: ReadonlySet<PowerId>) {
@@ -86,4 +119,13 @@ export function applyPowers(unlocked: ReadonlySet<PowerId>) {
   powerState.damageMult = unlocked.has('strength') ? 2 : 1;
   powerState.damageTakenMult = unlocked.has('shield') ? 0.5 : 1;
   powerState.fastRegen = unlocked.has('regen');
+  powerState.reachMult = unlocked.has('reach') ? 2 : 1;
+  powerState.carSpeedMult = unlocked.has('turbo') ? 1.5 : 1;
+  powerState.carDamageTakenMult = unlocked.has('chassis') ? 0.5 : 1;
+  powerState.fullRepair = unlocked.has('mechanic');
+  powerState.doubleJump = unlocked.has('doublejump');
+  powerState.zombieSpeedMult = unlocked.has('fear') ? 0.55 : 1;
+  powerState.critChance = unlocked.has('crit') ? 0.25 : 0;
+  powerState.maxHealth = unlocked.has('vitality') ? 16 : 10;
+  powerState.lootLuck = unlocked.has('loot');
 }

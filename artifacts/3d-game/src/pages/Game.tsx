@@ -194,9 +194,9 @@ export default function Game() {
     handleRespawnGuard();
     playerPosRef.current.set(8, 18, 8);
     drivingState.justExited = true;
-    healthRef.current = 10;
+    healthRef.current = powerState.maxHealth;
     aliveRef.current = true;
-    setHealth(10);
+    setHealth(powerState.maxHealth);
     setShowDeath(false);
     setRespawnSignal(s => s + 1);
   }, []);
@@ -216,12 +216,12 @@ export default function Game() {
       if (above === 'door') world.setBlock(wx, wy + 1, wz, 'air');
       if (below === 'door') world.setBlock(wx, wy - 1, wz, 'air');
     } else if (bt === 'chest') {
-      setChestLoot(generateLoot());
+      setChestLoot(generateLoot(powerState.lootLuck));
       setChestOpen(true);
       if (document.pointerLockElement) document.exitPointerLock();
     } else if (bt === 'bed') {
-      healthRef.current = 10;
-      setHealth(10);
+      healthRef.current = powerState.maxHealth;
+      setHealth(powerState.maxHealth);
       showToast('You slept soundly. Full health restored.');
     }
   }, [world, showToast]);
@@ -234,9 +234,9 @@ export default function Game() {
   }, []);
 
   useEffect(() => {
-    if (health >= 10 || health <= 0) return;
+    if (health >= powerState.maxHealth || health <= 0) return;
     const t = setInterval(() => {
-      setHealth(h => (h < 10 && h > 0 ? h + 1 : h));
+      setHealth(h => (h < powerState.maxHealth && h > 0 ? h + 1 : h));
     }, powerState.fastRegen ? 1200 : 4000);
     return () => clearInterval(t);
   }, [health, unlockedPowers]);
@@ -350,7 +350,7 @@ export default function Game() {
       setUnlockedPowers(prev => {
         if (prev.has(match.id)) {
           // Bonus for finding another number of an already-active power
-          const healed = Math.min(10, healthRef.current + 2);
+          const healed = Math.min(powerState.maxHealth, healthRef.current + 2);
           healthRef.current = healed;
           setHealth(healed);
           showToast(`${match.icon} Another ${match.name} number! Bonus: +2 health.`);
@@ -476,7 +476,7 @@ export default function Game() {
         onToggleTouchMode={() => setTouchMode(t => !t)}
         onStart={() => setStarted(true)}
         health={health}
-        maxHealth={10}
+        maxHealth={powerState.maxHealth}
         weapon={weapon}
         onSelectWeapon={setWeapon}
         carInfo={carInfo}
