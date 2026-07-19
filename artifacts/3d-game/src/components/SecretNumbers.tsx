@@ -1,14 +1,17 @@
-import { useRef } from 'react';
+import { useRef, type MutableRefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { WorldState } from '../game/useWorld';
 import { SECRET_SPOTS } from '../game/powers';
 
+const VIEW_DIST = 90;
+const RESOLVE_DIST = 110;
+
 function findGroundY(world: WorldState, x: number, z: number): number | null {
   const ix = Math.floor(x);
   const iz = Math.floor(z);
-  for (let y = 40; y >= 0; y--) {
+  for (let y = 50; y >= 0; y--) {
     const b = world.getBlock(ix, y, iz);
     if (b && b !== 'air' && b !== 'water') return y + 1;
   }
@@ -18,37 +21,44 @@ function findGroundY(world: WorldState, x: number, z: number): number | null {
 interface SecretNumbersProps {
   world: WorldState;
   found: ReadonlySet<string>;
+  playerPosRef: MutableRefObject<THREE.Vector3>;
 }
 
-export function SecretNumbers({ world, found }: SecretNumbersProps) {
+export function SecretNumbers({ world, found, playerPosRef }: SecretNumbersProps) {
   const groupRefs = useRef<(THREE.Group | null)[]>(SECRET_SPOTS.map(() => null));
   const baseYs = useRef<(number | null)[]>(SECRET_SPOTS.map(() => null));
   const resolveTimer = useRef(0);
 
   useFrame((_, delta) => {
     const t = performance.now() * 0.001;
+    const px = playerPosRef.current.x;
+    const pz = playerPosRef.current.z;
 
-    // Periodically resolve/refresh ground height (chunks load dynamically)
+    // Periodically resolve/refresh ground height for nearby spots (chunks load dynamically)
     resolveTimer.current -= delta;
-    if (resolveTimer.current <= 0) {
-      resolveTimer.current = 0.5;
-      for (let i = 0; i < SECRET_SPOTS.length; i++) {
-        const s = SECRET_SPOTS[i];
+    const doResolve = resolveTimer.current <= 0;
+    if (doResolve) resolveTimer.current = 0.5;
+
+    for (let i = 0; i < SECRET_SPOTS.length; i++) {
+      const s = SECRET_SPOTS[i];
+      const dx = s.x - px;
+      const dz = s.z - pz;
+      const distSq = dx * dx + dz * dz;
+
+      if (doResolve && distSq < RESOLVE_DIST * RESOLVE_DIST) {
         const gy = findGroundY(world, s.x, s.z);
         if (gy !== null) baseYs.current[i] = gy;
       }
-    }
 
-    for (let i = 0; i < SECRET_SPOTS.length; i++) {
       const g = groupRefs.current[i];
       if (!g) continue;
       const baseY = baseYs.current[i];
-      if (baseY === null) {
+      if (baseY === null || distSq > VIEW_DIST * VIEW_DIST || found.has(s.code)) {
         g.visible = false;
         continue;
       }
-      g.visible = !found.has(SECRET_SPOTS[i].code);
-      g.position.set(SECRET_SPOTS[i].x, baseY + 1.6 + Math.sin(t * 1.5 + i * 1.3) * 0.25, SECRET_SPOTS[i].z);
+      g.visible = true;
+      g.position.set(s.x, baseY + 1.6 + Math.sin(t * 1.5 + i * 1.3) * 0.25, s.z);
     }
   });
 
@@ -74,7 +84,6 @@ export function SecretNumbers({ world, found }: SecretNumbersProps) {
               {s.code}
             </Text>
           </Billboard>
-          <pointLight color={s.color} intensity={6} distance={7} />
         </group>
       ))}
     </>

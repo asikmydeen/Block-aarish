@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef, Suspense, type MutableRefObject } from 'react';
+import { useState, useCallback, useEffect, useRef, Suspense, type MutableRefObject } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { KeyboardControls, Sky, Stars } from '@react-three/drei';
 import * as THREE from 'three';
@@ -17,7 +17,7 @@ import { WEAPONS, type WeaponType } from '../game/combat';
 import { Cars } from '../components/Cars';
 import { generateRoadUpdates } from '../game/roads';
 import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
-import { POWERS, type PowerId, applyPowers, powerState } from '../game/powers';
+import { CODE_TO_POWER, type PowerId, applyPowers, powerState } from '../game/powers';
 import { SecretNumbers } from '../components/SecretNumbers';
 
 enum Controls {
@@ -144,13 +144,7 @@ export default function Game() {
   const codeOpenRef = useRef(false);
   const chestOpenRef = useRef(false);
   const openCodeBoxRef = useRef<(() => void) | null>(null);
-  const foundCodes = useMemo(() => {
-    const s = new Set<string>();
-    POWERS.forEach(p => {
-      if (unlockedPowers.has(p.id)) s.add(p.code);
-    });
-    return s;
-  }, [unlockedPowers]);
+  const [enteredCodes, setEnteredCodes] = useState<Set<string>>(new Set());
   const playerPosRef = useRef(new THREE.Vector3(8, 18, 8));
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -342,13 +336,24 @@ export default function Game() {
   const handleCodeSubmit = useCallback(() => {
     const entered = codeValue.trim();
     if (!entered) return;
-    const match = POWERS.find(p => p.code === entered);
+    const match = CODE_TO_POWER.get(entered);
     if (!match) {
       showToast('Nothing happened... that number holds no power.');
+    } else if (enteredCodes.has(entered)) {
+      showToast('You already used that number!');
     } else {
+      setEnteredCodes(prev => {
+        const next = new Set(prev);
+        next.add(entered);
+        return next;
+      });
       setUnlockedPowers(prev => {
         if (prev.has(match.id)) {
-          showToast(`${match.icon} ${match.name} is already active!`);
+          // Bonus for finding another number of an already-active power
+          const healed = Math.min(10, healthRef.current + 2);
+          healthRef.current = healed;
+          setHealth(healed);
+          showToast(`${match.icon} Another ${match.name} number! Bonus: +2 health.`);
           return prev;
         }
         const next = new Set(prev);
@@ -361,7 +366,7 @@ export default function Game() {
     codeOpenRef.current = false;
     setCodeOpen(false);
     setCodeValue('');
-  }, [codeValue, showToast]);
+  }, [codeValue, enteredCodes, showToast]);
 
   const handleCarButton = useCallback(() => {
     const res = carsRegistry.toggleDrive?.(playerPosRef.current);
@@ -457,7 +462,7 @@ export default function Game() {
               onCrash={handleCrash}
               onNearCar={setNearCar}
             />
-            <SecretNumbers world={world} found={foundCodes} />
+            <SecretNumbers world={world} found={enteredCodes} playerPosRef={playerPosRef} />
           </Suspense>
         </Canvas>
       </KeyboardControls>

@@ -18,15 +18,56 @@ export const POWERS: PowerSpec[] = [
   { id: 'feather', code: '168', name: 'Feather Fall', icon: '🪶', desc: 'Low gravity — float like a feather', color: '#e0aaff' },
 ];
 
-// Where each secret number hides in the world (y resolved from terrain at runtime)
-export const SECRET_SPOTS: Array<{ code: string; x: number; z: number; color: string }> = [
-  { code: '247', x: 35, z: -6, color: '#ffd24d' },
-  { code: '583', x: -22, z: -14, color: '#5ad1ff' },
-  { code: '916', x: 55, z: 14, color: '#ff6b5a' },
-  { code: '342', x: -40, z: 44, color: '#b0bec5' },
-  { code: '775', x: 8, z: -52, color: '#66ff8c' },
-  { code: '168', x: -58, z: -58, color: '#e0aaff' },
-];
+// Hundreds of secret numbers scattered across the world (y resolved from terrain at runtime).
+// Each code maps to one of the 6 powers. Deterministic seeded generation so the world
+// is the same every session.
+function mulberry32(seed: number) {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export interface SecretSpot {
+  code: string;
+  x: number;
+  z: number;
+  color: string;
+  powerId: PowerId;
+}
+
+function generateSpots(): { spots: SecretSpot[]; codeToPower: Map<string, PowerSpec> } {
+  const rand = mulberry32(20260719);
+  const spots: SecretSpot[] = [];
+  const codeToPower = new Map<string, PowerSpec>();
+  const usedCodes = new Set<string>();
+  const COUNT = 300;
+  for (let i = 0; i < COUNT; i++) {
+    let code = '';
+    do {
+      code = String(100 + Math.floor(rand() * 900));
+    } while (usedCodes.has(code) && usedCodes.size < 890);
+    if (usedCodes.has(code)) break;
+    usedCodes.add(code);
+    const power = POWERS[i % POWERS.length];
+    // Spread across the world, avoid the exact spawn point
+    let x = 0;
+    let z = 0;
+    do {
+      x = Math.floor((rand() - 0.5) * 300);
+      z = Math.floor((rand() - 0.5) * 300);
+    } while (Math.abs(x - 8) < 5 && Math.abs(z - 8) < 5);
+    spots.push({ code, x, z, color: power.color, powerId: power.id });
+    codeToPower.set(code, power);
+  }
+  return { spots, codeToPower };
+}
+
+const generated = generateSpots();
+export const SECRET_SPOTS: SecretSpot[] = generated.spots;
+export const CODE_TO_POWER: Map<string, PowerSpec> = generated.codeToPower;
 
 // Mutable multipliers read by Player/combat each frame.
 export const powerState = {

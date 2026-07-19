@@ -492,7 +492,7 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>CAR — Enter/exit car</div>
               <div>FIX — Repair car</div>
               <div>CODE — Enter secret number</div>
-              <div style={{ color: '#e0aaff' }}>6 secret numbers hide in the world...</div>
+              <div style={{ color: '#e0aaff' }}>Hundreds of numbers hide in the world...</div>
             </>
           ) : (
             <>
@@ -506,7 +506,7 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>E — Enter/exit car</div>
               <div>R — Repair car</div>
               <div>C — Enter secret number</div>
-              <div style={{ color: '#e0aaff' }}>6 secret numbers hide in the world...</div>
+              <div style={{ color: '#e0aaff' }}>Hundreds of numbers hide in the world...</div>
               <div>Click game — Lock mouse</div>
               <div>Esc — Unlock mouse</div>
             </>
