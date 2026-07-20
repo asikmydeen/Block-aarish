@@ -428,10 +428,32 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
         position: 'fixed',
         top: 16,
         right: 16,
-        zIndex: 100,
+        zIndex: 300,
         display: 'flex',
         gap: 8,
       }}>
+        {onMenu && (
+          <button
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onMenu();
+            }}
+            style={{
+              background: 'rgba(0,0,0,0.5)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.2)',
+              borderRadius: 6,
+              padding: '4px 12px',
+              cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: 13,
+              touchAction: 'none',
+            }}
+          >
+            🏠 Menu
+          </button>
+        )}
         <button
           onClick={onToggleTouchMode}
           style={{
@@ -448,8 +470,13 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
           {touchMode ? '📱 Touch' : '🖱️ Mouse'}
         </button>
         <button
-          onClick={() => setShowHelp(h => !h)}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowHelp(h => !h);
+          }}
           style={{
+            touchAction: 'none',
             background: 'rgba(0,0,0,0.5)',
             color: 'white',
             border: '1px solid rgba(255,255,255,0.2)',
@@ -474,7 +501,7 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
           color: 'white',
           padding: '12px 16px',
           borderRadius: 8,
-          zIndex: 100,
+          zIndex: 300,
           fontFamily: 'monospace',
           fontSize: 13,
           lineHeight: 2,
