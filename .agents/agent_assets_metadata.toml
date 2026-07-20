@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "jhTeEZtFhWTcrc3rs4802"
+uri = "file://artifacts/craftworld-deck/public/hero.png"
+type = "image"
+title = "voxel landscape hero"

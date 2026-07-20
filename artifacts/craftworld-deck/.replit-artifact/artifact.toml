@@ -1,0 +1,31 @@
+kind = "slides"
+previewPath = "/craftworld-deck/"
+title = "Craftworld Deck"
+version = "1.0.0"
+id = "artifacts/craftworld-deck"
+router = "path"
+
+[[integratedSkills]]
+name = "slides"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/craftworld-deck/" ]
+localPort = 23622
+
+[services.development]
+run = "pnpm --filter @workspace/craftworld-deck run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/craftworld-deck", "run", "build" ]
+publicDir = "artifacts/craftworld-deck/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23622"
+BASE_PATH = "/craftworld-deck/"
