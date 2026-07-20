@@ -74,8 +74,8 @@ export interface SecretSpot {
   fixedY?: number;
 }
 
-function generateSpots(): { spots: SecretSpot[]; codeToPower: Map<string, PowerSpec> } {
-  const rand = mulberry32(20260719);
+function generateSpots(seed: number): { spots: SecretSpot[]; codeToPower: Map<string, PowerSpec> } {
+  const rand = mulberry32(seed);
   const spots: SecretSpot[] = [];
   const codeToPower = new Map<string, PowerSpec>();
   const usedCodes = new Set<string>();
@@ -133,9 +133,22 @@ function generateSpots(): { spots: SecretSpot[]; codeToPower: Map<string, PowerS
   return { spots, codeToPower };
 }
 
-const generated = generateSpots();
+// Fixed seed used for multiplayer so every player shares the same world.
+export const SHARED_SEED = 20260719;
+
+const generated = generateSpots(SHARED_SEED);
 export const SECRET_SPOTS: SecretSpot[] = generated.spots;
 export const CODE_TO_POWER: Map<string, PowerSpec> = generated.codeToPower;
+
+// Re-scatter the secret numbers (fresh hiding places + codes). Mutates the
+// exported array/map in place so all importers see the new spots.
+export function regenerateSecretSpots(seed: number = Math.floor(Math.random() * 2 ** 31)) {
+  const fresh = generateSpots(seed);
+  SECRET_SPOTS.length = 0;
+  SECRET_SPOTS.push(...fresh.spots);
+  CODE_TO_POWER.clear();
+  for (const [code, spec] of fresh.codeToPower) CODE_TO_POWER.set(code, spec);
+}
 
 // Mutable multipliers read by Player/combat/cars/zombies each frame.
 export const powerState = {

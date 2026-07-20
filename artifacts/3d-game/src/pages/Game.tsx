@@ -17,7 +17,7 @@ import { WEAPONS, type WeaponType, combatRegistry } from '../game/combat';
 import { Cars } from '../components/Cars';
 import { generateRoadUpdates } from '../game/roads';
 import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
-import { CODE_TO_POWER, SECRET_SPOTS, type PowerId, applyPowers, powerState } from '../game/powers';
+import { CODE_TO_POWER, SECRET_SPOTS, SHARED_SEED, type PowerId, applyPowers, powerState, regenerateSecretSpots } from '../game/powers';
 import { SecretNumbers } from '../components/SecretNumbers';
 import { RemotePlayers } from '../components/RemotePlayers';
 
@@ -125,6 +125,12 @@ function GameScene({
 
 export default function Game({ mode, onMenu }: { mode: GameMode; onMenu?: () => void }) {
   const codesEnabled = mode !== 'free';
+  // Re-scatter secret numbers each single-player session; multiplayer always
+  // uses the shared seed so everyone sees the same world. Runs once, before
+  // the first render of any child that reads the spots.
+  useState(() => {
+    regenerateSecretSpots(mode === 'multi' ? SHARED_SEED : undefined);
+  });
   const world = useWorld();
   const [mpStatus, setMpStatus] = useState<{ status: 'connecting' | 'online' | 'offline'; count: number }>({ status: 'connecting', count: 0 });
   const [selectedBlock, setSelectedBlock] = useState<BlockType>('dirt');
