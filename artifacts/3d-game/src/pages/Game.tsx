@@ -19,6 +19,9 @@ import { generateRoadUpdates } from '../game/roads';
 import { CAR_SPECS, type CarInfo, type CarKind, carsRegistry, drivingState } from '../game/cars';
 import { CODE_TO_POWER, SECRET_SPOTS, type PowerId, applyPowers, powerState } from '../game/powers';
 import { SecretNumbers } from '../components/SecretNumbers';
+import { RemotePlayers } from '../components/RemotePlayers';
+
+export type GameMode = 'numbers' | 'free' | 'multi';
 
 enum Controls {
   forward = 'forward',
@@ -120,8 +123,10 @@ function GameScene({
   );
 }
 
-export default function Game() {
+export default function Game({ mode, onMenu }: { mode: GameMode; onMenu?: () => void }) {
+  const codesEnabled = mode !== 'free';
   const world = useWorld();
+  const [mpStatus, setMpStatus] = useState<{ status: 'connecting' | 'online' | 'offline'; count: number }>({ status: 'connecting', count: 0 });
   const [selectedBlock, setSelectedBlock] = useState<BlockType>('dirt');
   const [weapon, setWeapon] = useState<WeaponType>('hand');
   const [playerPos, setPlayerPos] = useState(() => new THREE.Vector3(8, 18, 8));
@@ -313,7 +318,7 @@ export default function Game() {
         healthRef.current = healed;
         setHealth(healed);
       }
-      if (Math.random() < 0.2) {
+      if (codesEnabled && Math.random() < 0.2) {
         const unused = SECRET_SPOTS.filter(s => !enteredCodesRef.current.has(s.code));
         if (unused.length > 0) {
           const pick = unused[Math.floor(Math.random() * unused.length)];
@@ -337,6 +342,7 @@ export default function Game() {
   }, [showToast]);
 
   const openCodeBox = useCallback(() => {
+    if (!codesEnabled) return;
     if (drivingState.active) {
       showToastRef.current?.('Stop the car first! (E to get out)');
       return;
@@ -491,7 +497,13 @@ export default function Game() {
               onCrash={handleCrash}
               onNearCar={setNearCar}
             />
-            <SecretNumbers world={world} found={enteredCodes} playerPosRef={playerPosRef} />
+            {codesEnabled && <SecretNumbers world={world} found={enteredCodes} playerPosRef={playerPosRef} />}
+            {mode === 'multi' && (
+              <RemotePlayers
+                playerPosRef={playerPosRef}
+                onStatusChange={(status, count) => setMpStatus({ status, count })}
+              />
+            )}
           </Suspense>
         </Canvas>
       </KeyboardControls>
@@ -514,7 +526,34 @@ export default function Game() {
         onRepairButton={handleRepairButton}
         unlockedPowers={unlockedPowers}
         onCodeButton={openCodeBox}
+        codesEnabled={codesEnabled}
+        onMenu={onMenu}
       />
+
+      {mode === 'multi' && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.55)',
+            color: mpStatus.status === 'online' ? '#8affc1' : mpStatus.status === 'connecting' ? '#ffd24d' : '#ff8a8a',
+            padding: '4px 14px',
+            borderRadius: 8,
+            fontFamily: 'monospace',
+            fontSize: 12,
+            zIndex: 100,
+            pointerEvents: 'none',
+          }}
+        >
+          {mpStatus.status === 'online'
+            ? `🌐 Online — ${mpStatus.count} other player${mpStatus.count === 1 ? '' : 's'}`
+            : mpStatus.status === 'connecting'
+              ? '🌐 Connecting...'
+              : '🌐 Offline — reconnecting...'}
+        </div>
+      )}
 
       {isFlashing && (
         <div

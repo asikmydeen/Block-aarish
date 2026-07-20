@@ -30,6 +30,8 @@ interface GameUIProps {
   onRepairButton: () => void;
   unlockedPowers: ReadonlySet<PowerId>;
   onCodeButton: () => void;
+  codesEnabled: boolean;
+  onMenu?: () => void;
 }
 
 function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
@@ -52,7 +54,7 @@ function Heart({ state }: { state: 'full' | 'half' | 'empty' }) {
   );
 }
 
-export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon, carInfo, nearCar, onCarButton, onRepairButton, unlockedPowers, onCodeButton }: GameUIProps) {
+export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touchMode, onToggleTouchMode, onStart, health, maxHealth, weapon, onSelectWeapon, carInfo, nearCar, onCarButton, onRepairButton, unlockedPowers, onCodeButton, codesEnabled, onMenu }: GameUIProps) {
   const [showHelp, setShowHelp] = useState(false);
 
   return (
@@ -333,7 +335,7 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               FIX 🔧
             </button>
           )}
-          {!carInfo && (
+          {!carInfo && codesEnabled && (
             <button
               onPointerDown={(e) => {
                 e.preventDefault();
@@ -397,7 +399,7 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
       </div>
 
       {/* Active powers HUD */}
-      {unlockedPowers.size > 0 && (
+      {codesEnabled && unlockedPowers.size > 0 && (
         <div style={{
           position: 'fixed',
           top: 96,
@@ -491,8 +493,8 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>Tap weapon — Equip</div>
               <div>CAR — Enter/exit car</div>
               <div>FIX — Repair car</div>
-              <div>CODE — Enter secret number</div>
-              <div style={{ color: '#e0aaff' }}>Hundreds of numbers hide in the world...</div>
+              {codesEnabled && <div>CODE — Enter secret number</div>}
+              {codesEnabled && <div style={{ color: '#e0aaff' }}>Secret numbers hide in the world...</div>}
             </>
           ) : (
             <>
@@ -505,8 +507,8 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
               <div>Q — Switch weapon</div>
               <div>E — Enter/exit car</div>
               <div>R — Repair car</div>
-              <div>C — Enter secret number</div>
-              <div style={{ color: '#e0aaff' }}>Hundreds of numbers hide in the world...</div>
+              {codesEnabled && <div>C — Enter secret number</div>}
+              {codesEnabled && <div style={{ color: '#e0aaff' }}>Secret numbers hide in the world...</div>}
               <div>Click game — Lock mouse</div>
               <div>Esc — Unlock mouse</div>
             </>
@@ -552,6 +554,27 @@ export function GameUI({ selectedBlock, onSelectBlock, position, isLocked, touch
                 ? 'Joystick to move • Drag to look • Tap buttons to build'
                 : 'WASD to move • Space to jump • Click to build'}
             </div>
+            {onMenu && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMenu();
+                }}
+                style={{
+                  marginTop: 16,
+                  background: 'rgba(255,255,255,0.12)',
+                  color: '#ccc',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 8,
+                  padding: '8px 20px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                }}
+              >
+                ← Back to menu
+              </button>
+            )}
           </div>
         </div>
       )}
